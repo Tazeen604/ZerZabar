@@ -1,0 +1,120 @@
+import { createTheme } from '@mui/material/styles';
+
+const adminTheme = createTheme({
+  palette: {
+    primary: {
+      main: '#FFD700', // Yellow
+      light: '#FFF59D',
+      dark: '#F57F17',
+    },
+    secondary: {
+      main: '#424242', // Dark grey
+      light: '#6D6D6D',
+      dark: '#212121',
+    },
+    background: {
+      default: '#FAFAFA', // Light grey
+      paper: '#FFFFFF',
+    },
+    text: {
+      primary: '#212121', // Black
+      secondary: '#757575', // Grey
+    },
+    success: {
+      main: '#4CAF50',
+    },
+    warning: {
+      main: '#FF9800',
+    },
+    error: {
+      main: '#F44336',
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontSize: '2.5rem',
+      fontWeight: 600,
+    },
+    h2: {
+      fontSize: '2rem',
+      fontWeight: 600,
+    },
+    h3: {
+      fontSize: '1.75rem',
+      fontWeight: 600,
+    },
+    h4: {
+      fontSize: '1.5rem',
+      fontWeight: 600,
+    },
+    h5: {
+      fontSize: '1.25rem',
+      fontWeight: 600,
+    },
+    h6: {
+      fontSize: '1rem',
+      fontWeight: 600,
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          borderRadius: 8,
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          },
+        },
+        contained: {
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+            transform: 'translateY(-2px)',
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            transform: 'scale(1.1)',
+          },
+        },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: '#2C2C2C',
+          color: '#FFFFFF',
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#FFFFFF',
+          color: '#212121',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        },
+      },
+    },
+  },
+});
+
+export default adminTheme;
