@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
+  Container,
   Typography,
   Grid,
   Card,
@@ -21,6 +22,8 @@ import { Search, FilterList, ShoppingCart, Visibility } from "@mui/icons-materia
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import apiService from "../services/api";
+import PageContainer from "../components/PageContainer";
+import Footer from "../components/Footer";
 
 const Shop = () => {
   const [products, setProducts] = useState([]);
@@ -49,8 +52,9 @@ const Shop = () => {
       setSelectedCategory(categoryFromUrl);
       console.log('Set selectedCategory to:', categoryFromUrl);
     } else {
-      // Clear category if no URL parameter
+      // Clear category if no URL parameter - this should show all products
       setSelectedCategory("");
+      console.log('No category in URL, clearing selectedCategory to show all products');
     }
   }, [searchParams]);
 
@@ -62,6 +66,7 @@ const Shop = () => {
   // Fetch products when filters change - with delay to ensure state is set
   useEffect(() => {
     const timeoutId = setTimeout(() => {
+      console.log('useEffect triggered for fetchProducts with selectedCategory:', selectedCategory);
       fetchProducts();
     }, 100); // Small delay to ensure state is properly set
     
@@ -76,34 +81,33 @@ const fetchProducts = async () => {
     // Build params but filter out empty strings / null / undefined
     const rawParams = {
       search: searchTerm ? searchTerm.trim() : "",
-      category_id: selectedCategory,
       sort_by: sortBy,
       sort_order: sortOrder,
       page: currentPage,
       per_page: 12,
     };
     
-    // TEMPORARY: Force category_id to be included even if empty for debugging
-    if (selectedCategory) {
+    // Only include category_id if selectedCategory is not empty
+    if (selectedCategory && selectedCategory !== "") {
       rawParams.category_id = selectedCategory;
     }
 
-    // Don't filter out category_id even if it's empty string - let backend handle it
+    // Filter out empty values
     const params = Object.fromEntries(
       Object.entries(rawParams).filter(([key, v]) => {
-        if (key === 'category_id') return true; // Always include category_id
         return v !== "" && v !== null && v !== undefined;
       })
     );
 
     console.log('=== SHOP DEBUG ===');
     console.log('Fetching products with params:', params);
-    console.log('selectedCategory value:', selectedCategory);
+    console.log('selectedCategory value:', selectedCategory, 'type:', typeof selectedCategory);
     console.log('searchTerm value:', searchTerm);
     console.log('sortBy value:', sortBy);
     console.log('sortOrder value:', sortOrder);
     console.log('rawParams before filtering:', rawParams);
     console.log('params after filtering:', params);
+    console.log('Will include category_id?', selectedCategory && selectedCategory !== "");
     const response = await apiService.getProducts(params);
     console.log('API Response:', response);
     console.log('=== END DEBUG ===');
@@ -205,78 +209,126 @@ const fetchCategories = async () => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <Box sx={{ 
+      backgroundColor: '#fff', 
+      minHeight: '100vh', 
+      pt: 12,
+      width: '100%'
+    }}>
+      <Container 
+        maxWidth="xl"
+        sx={{ 
+          maxWidth: '1280px !important', // Increased width for 4 cards
+          mx: 'auto',
+          px: { xs: 1, sm: 2, md: 2 } // Reduced padding for 4 cards
+        }}
+      >
       {/* Header */}
-      <Box sx={{ backgroundColor: '#fff', py: 4, mb: 4 }}>
-        <Box sx={{ maxWidth: '1200px', mx: 'auto', px: 3 }}>
-          <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#333', mb: 2 }}>
+        <Box sx={{ backgroundColor: '#fff', py: 2, mb: 2, px: 0 }}>
+        <Typography variant="h4" sx={{ fontWeight: 300, color: '#000', mb: 0.5, textAlign: 'left', fontSize: '1.8rem', letterSpacing: '0.5px' }}>
             Shop
           </Typography>
-          <Typography variant="h6" sx={{ color: '#666' }}>
-            Discover our premium collection of gents fashion
+        <Typography variant="body2" sx={{ color: '#666', textAlign: 'left', fontSize: '0.85rem' }}>
+          Discover our premium collection
           </Typography>
-        </Box>
       </Box>
 
       {/* Filters */}
-      <Box sx={{ maxWidth: '1200px', mx: 'auto', px: 3, mb: 4 }}>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Box sx={{ mb: 3, py: 2, borderBottom: '1px solid #f0f0f0' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
           <TextField
-            placeholder="Search products..."
+              placeholder="Search..."
             value={searchTerm}
             onChange={handleSearch}
-            sx={{ minWidth: 200 }}
+              size="small"
+              sx={{ 
+                minWidth: 180,
+                '& .MuiOutlinedInput-root': {
+                  fontSize: '0.85rem',
+                  borderRadius: 0,
+                }
+              }}
             InputProps={{
-              startAdornment: <Search sx={{ mr: 1, color: '#666' }} />,
+                startAdornment: <Search sx={{ mr: 0.5, color: '#666', fontSize: '18px' }} />,
             }}
           />
 
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Category</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel sx={{ fontSize: '0.85rem' }}>Category</InputLabel>
             <Select
               value={selectedCategory}
               onChange={handleCategoryChange}
               label="Category"
+                displayEmpty
+                sx={{ 
+                  fontSize: '0.85rem',
+                  borderRadius: 0,
+                }}
             >
-              <MenuItem value="">All Categories</MenuItem>
+                <MenuItem value="" sx={{ fontSize: '0.85rem' }}>All Products</MenuItem>
               {categories.map((category) => (
-                <MenuItem key={category.id} value={category.id}>
+                  <MenuItem key={category.id} value={category.id} sx={{ fontSize: '0.85rem' }}>
                   {category.name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
 
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Sort By</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 100 }}>
+              <InputLabel sx={{ fontSize: '0.85rem' }}>Sort</InputLabel>
             <Select
               value={sortBy}
               onChange={handleSortChange}
-              label="Sort By"
-            >
-              <MenuItem value="created_at">Newest</MenuItem>
-              <MenuItem value="name">Name</MenuItem>
-              <MenuItem value="price">Price</MenuItem>
+                label="Sort"
+                sx={{ 
+                  fontSize: '0.85rem',
+                  borderRadius: 0,
+                }}
+              >
+                <MenuItem value="created_at" sx={{ fontSize: '0.85rem' }}>Newest</MenuItem>
+                <MenuItem value="name" sx={{ fontSize: '0.85rem' }}>Name</MenuItem>
+                <MenuItem value="price" sx={{ fontSize: '0.85rem' }}>Price</MenuItem>
             </Select>
           </FormControl>
+          </Box>
 
           <Button
-            variant="outlined"
-            startIcon={<FilterList />}
+            variant="text"
             onClick={() => {
               setSearchTerm("");
               setSelectedCategory("");
               setSortBy("created_at");
               setCurrentPage(1);
             }}
+            sx={{
+              fontSize: '0.8rem',
+              color: '#666',
+              textTransform: 'none',
+              minWidth: 'auto',
+              px: 1,
+              '&:hover': {
+                backgroundColor: 'transparent',
+                textDecoration: 'underline',
+              }
+            }}
           >
-            Clear Filters
+            Clear all
           </Button>
         </Box>
       </Box>
 
+      {/* Product Count */}
+      {!loading && !isInitialLoad && (
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
+            {products.length} {products.length === 1 ? 'product' : 'products'}
+          </Typography>
+        </Box>
+      )}
+
       {/* Products Grid */}
-      <Box sx={{ maxWidth: '1200px', mx: 'auto', px: 3, mb: 4 }}>
+      <Box sx={{ mb: 4 }}>
         {loading || isInitialLoad ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
             <CircularProgress />
@@ -286,21 +338,48 @@ const fetchCategories = async () => {
             <Typography variant="h6" sx={{ color: '#666' }}>
               No products found
             </Typography>
+            <Typography variant="body2" sx={{ color: '#999', mt: 1 }}>
+              Debug: Loading: {loading.toString()}, Products length: {products.length}
+            </Typography>
           </Box>
         ) : (
-          <Grid container spacing={3}>
+          <Grid 
+            container 
+            spacing={2} 
+            sx={{ 
+              width: '100%',
+              margin: 0,
+              justifyContent: 'center', // Center the grid items
+              '& .MuiGrid-item': {
+                paddingLeft: '8px',
+                paddingTop: '8px',
+                display: 'flex',
+                justifyContent: 'center',
+              }
+            }}
+          >
             {products.map((product) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+              <Grid item xs={12} sm={6} md={3} lg={3} xl={3} key={product.id} sx={{ 
+                display: 'flex', 
+                justifyContent: 'center',
+                minWidth: '280px', // Minimum width for consistency
+              }}>
                 <Card
                   sx={{
-                    height: '100%',
+                    height: '470px', // Increased height for better button spacing
+                    width: '280px', // Fixed width for all cards
+                    minWidth: '280px', // Ensure minimum width
+                    maxWidth: '280px', // Prevent width expansion
                     display: 'flex',
                     flexDirection: 'column',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
+                    transition: 'all 0.2s ease',
+                    borderRadius: 0, // Sharp corners like Zara/H&M
+                    boxShadow: 'none',
+                    border: '1px solid #f0f0f0',
+                    flexShrink: 0, // Prevent shrinking
                     '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     },
                   }}
                   onClick={() => handleProductClick(product.id)}
@@ -308,68 +387,79 @@ const fetchCategories = async () => {
                   <Box
                     sx={{
                       position: 'relative',
-                      width: '100%',
-                      height: '250px',
+                      width: '280px', // Fixed width matching card
+                      height: '320px', // Increased height for better proportions
+                      minHeight: '320px', // Ensure minimum height
+                      maxHeight: '320px', // Prevent height expansion
                       overflow: 'hidden',
+                      backgroundColor: '#f9f9f9',
+                      flexShrink: 0, // Prevent shrinking
                     }}
                   >
                     <img
-                      src={product.images?.[0]?.image_path ? `http://localhost:8000/storage/${product.images[0].image_path}` : "https://via.placeholder.com/300x250?text=No+Image"}
+                      src={product.images?.[0]?.image_path ? `http://localhost:8000/storage/${product.images[0].image_path}` : "https://via.placeholder.com/280x320?text=No+Image"}
                       alt={product.name}
                       style={{
-                        width: '100%',
-                        height: '100%',
+                        width: '280px', // Fixed width
+                        height: '320px', // Fixed height
                         objectFit: 'cover',
                         objectPosition: 'center',
+                        display: 'block', // Prevent inline spacing issues
                       }}
                     />
                   </Box>
-                  <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ mb: 1 }}>
+                  <CardContent sx={{ 
+                    height: '150px', // Increased height for better button spacing
+                    minHeight: '150px',
+                    maxHeight: '150px',
+                    width: '280px', // Fixed width matching card
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    justifyContent: 'space-between', // Distribute space evenly
+                    p: 1.5, 
+                    pb: 2.5, // Increased bottom padding for buttons
+                    '&:last-child': { pb: 2.5 }, // Ensure bottom padding
+                    overflow: 'hidden' // Prevent content overflow
+                  }}>
+                    <Box sx={{ mb: 0.5 }}>
                       <Chip
                         label={product.category?.name || "FASHION"}
                         size="small"
                         sx={{
-                          backgroundColor: '#f0f0f0',
+                          backgroundColor: '#f5f5f5',
                           color: '#666',
-                          fontSize: '0.7rem',
+                          fontSize: '0.6rem',
+                          height: '18px',
+                          borderRadius: 0,
                         }}
                       />
                     </Box>
 
                     <Typography
-                      variant="h6"
+                      variant="body1"
                       sx={{
-                        fontWeight: 'bold',
-                        color: '#333',
-                        mb: 1,
-                        fontSize: '1.1rem',
-                      }}
-                    >
-                      {product.name}
-                    </Typography>
-
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: '#666',
-                        mb: 2,
-                        flexGrow: 1,
+                        fontWeight: 400,
+                        color: '#000',
+                        mb: 0.5,
+                        fontSize: '0.85rem',
+                        lineHeight: 1.2,
+                        height: '2.4em', // Fixed height for 2 lines
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
                       }}
                     >
-                      {product.description}
+                      {product.name}
                     </Typography>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, mt: 'auto' }}>
                       <Typography
-                        variant="h6"
+                        variant="body1"
                         sx={{
-                          fontWeight: 'bold',
-                          color: '#333',
+                          fontWeight: 600,
+                          color: '#000',
+                          fontSize: '0.9rem',
                         }}
                       >
                         ₨{product.sale_price || product.price}
@@ -380,6 +470,7 @@ const fetchCategories = async () => {
                           sx={{
                             color: '#999',
                             textDecoration: 'line-through',
+                            fontSize: '0.8rem',
                           }}
                         >
                           ₨{product.price}
@@ -387,18 +478,32 @@ const fetchCategories = async () => {
                       )}
                     </Box>
 
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    {/* Spacer to push buttons to bottom */}
+                    <Box sx={{ flex: 1 }} />
+
+                    <Box sx={{ 
+                      display: 'flex', 
+                      gap: 1, // Increased gap between buttons
+                      mt: 1, // Add top margin for separation
+                      mb: 1.5, // Increased bottom margin for better visibility
+                      px: 0.5 // Add horizontal padding
+                    }}>
                       <Button
                         variant="contained"
-                        startIcon={<ShoppingCart />}
                         onClick={(e) => handleAddToCart(product, e)}
                         sx={{
-                          flex: 1,
+                          width: '180px', // Fixed width instead of flex: 1
                           backgroundColor: '#FFD700',
-                          color: '#333',
-                          fontWeight: 'bold',
+                          color: '#000',
+                          fontSize: '0.65rem', // Slightly smaller font
+                          fontWeight: 600,
+                          py: 0.8,
+                          px: 1,
+                          borderRadius: 0,
+                          textTransform: 'uppercase',
+                          minWidth: 'auto',
                           '&:hover': {
-                            backgroundColor: '#F57F17',
+                            backgroundColor: '#FFC107',
                           },
                         }}
                       >
@@ -406,21 +511,28 @@ const fetchCategories = async () => {
                       </Button>
                       <Button
                         variant="outlined"
-                        startIcon={<Visibility />}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleProductClick(product.id);
                         }}
                         sx={{
+                          minWidth: '45px',
+                          width: '45px', // Slightly larger for better proportion
+                          height: '36px', // Match Add to Cart button height
                           borderColor: '#FFD700',
                           color: '#FFD700',
+                          fontSize: '0.7rem',
+                          py: 0.8,
+                          px: 0.5,
+                          borderRadius: 0,
                           '&:hover': {
-                            borderColor: '#F57F17',
-                            color: '#F57F17',
+                            borderColor: '#FFC107',
+                            color: '#FFC107',
+                            backgroundColor: 'rgba(255, 215, 0, 0.04)',
                           },
                         }}
                       >
-                        View
+                        <Visibility sx={{ fontSize: '16px' }} />
                       </Button>
                     </Box>
                   </CardContent>
@@ -429,7 +541,6 @@ const fetchCategories = async () => {
             ))}
           </Grid>
         )}
-      </Box>
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -443,12 +554,18 @@ const fetchCategories = async () => {
           />
         </Box>
       )}
+      </Box>
+
+      </Container>
+
+      {/* Footer */}
+      <Footer />
 
       {/* Snackbar */}
       <Box
         sx={{
           position: 'fixed',
-          bottom: 20,
+          top: 100, // Position below navbar
           right: 20,
           zIndex: 1000,
         }}

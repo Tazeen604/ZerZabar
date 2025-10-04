@@ -32,7 +32,7 @@ const HeroBanner = () => {
         }}
       />
 
-      {/* Centered Content Wrapper */}
+      {/* Content Wrapper - Positioned below navbar */}
       <Box
         sx={{
           position: "relative",
@@ -41,9 +41,10 @@ const HeroBanner = () => {
           width: "100%",
           display: "flex",
           justifyContent: "center",
-          alignItems: "center",
+          alignItems: "flex-start",
           textAlign: "center",
           px: { xs: 2, sm: 4, md: 6 },
+          pt: { xs: 20, md: 24 }, // Top padding to position below navbar
         }}
       >
         {/* Overlay Box */}

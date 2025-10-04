@@ -24,11 +24,12 @@ import {
   LightMode,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 
 const TopBar = ({ sidebarOpen }) => {
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
+  const { isDarkMode, toggleTheme, theme } = useTheme();
 
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -36,10 +37,6 @@ const TopBar = ({ sidebarOpen }) => {
 
   const handleProfileMenuClose = () => {
     setAnchorEl(null);
-  };
-
-  const handleDarkModeToggle = () => {
-    setDarkMode(!darkMode);
   };
 
   const handleLogout = () => {
@@ -56,16 +53,18 @@ const TopBar = ({ sidebarOpen }) => {
         width: `calc(100% - ${sidebarOpen ? 280 : 60}px)`,
         ml: `${sidebarOpen ? 280 : 60}px`,
         transition: 'all 0.3s ease',
-        backgroundColor: '#FFFFFF',
-        color: '#212121',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        backgroundColor: theme.palette.background.paper,
+        color: theme.palette.text.primary,
+        boxShadow: theme.palette.mode === 'dark' 
+          ? '0 2px 8px rgba(0,0,0,0.3)' 
+          : '0 2px 8px rgba(0,0,0,0.1)',
         zIndex: 1200,
       }}
     >
       <Toolbar sx={{ justifyContent: 'space-between', px: 3 }}>
         {/* Welcome Message */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#212121' }}>
+          <Typography variant="h5" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
             WELCOME!
           </Typography>
         </Box>
@@ -74,26 +73,26 @@ const TopBar = ({ sidebarOpen }) => {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {/* Dark Mode Toggle */}
           <IconButton
-            onClick={handleDarkModeToggle}
+            onClick={toggleTheme}
             sx={{
-              color: '#424242',
+              color: theme.palette.text.secondary,
               '&:hover': {
                 backgroundColor: 'rgba(255, 215, 0, 0.1)',
-                color: '#FFD700',
+                color: theme.palette.primary.main,
               },
               transition: 'all 0.3s ease',
             }}
           >
-            {darkMode ? <LightMode /> : <DarkMode />}
+            {isDarkMode ? <LightMode /> : <DarkMode />}
           </IconButton>
 
           {/* Notifications */}
           <IconButton
             sx={{
-              color: '#424242',
+              color: theme.palette.text.secondary,
               '&:hover': {
                 backgroundColor: 'rgba(255, 215, 0, 0.1)',
-                color: '#FFD700',
+                color: theme.palette.primary.main,
               },
               transition: 'all 0.3s ease',
             }}
@@ -106,10 +105,10 @@ const TopBar = ({ sidebarOpen }) => {
           {/* Settings */}
           <IconButton
             sx={{
-              color: '#424242',
+              color: theme.palette.text.secondary,
               '&:hover': {
                 backgroundColor: 'rgba(255, 215, 0, 0.1)',
-                color: '#FFD700',
+                color: theme.palette.primary.main,
               },
               transition: 'all 0.3s ease',
             }}
@@ -125,22 +124,22 @@ const TopBar = ({ sidebarOpen }) => {
               width: 200,
               '& .MuiOutlinedInput-root': {
                 borderRadius: '20px',
-                backgroundColor: '#F5F5F5',
+                backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F5F5F5',
                 '& fieldset': {
                   border: 'none',
                 },
                 '&:hover fieldset': {
-                  border: '1px solid #FFD700',
+                  border: `1px solid ${theme.palette.primary.main}`,
                 },
                 '&.Mui-focused fieldset': {
-                  border: '2px solid #FFD700',
+                  border: `2px solid ${theme.palette.primary.main}`,
                 },
               },
             }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: '#757575' }} />
+                  <Search sx={{ color: theme.palette.text.secondary }} />
                 </InputAdornment>
               ),
             }}
@@ -161,11 +160,11 @@ const TopBar = ({ sidebarOpen }) => {
               sx={{
                 width: 36,
                 height: 36,
-                backgroundColor: '#FFD700',
-                color: '#2C2C2C',
+                backgroundColor: theme.palette.primary.main,
+                color: theme.palette.mode === 'dark' ? '#2C2C2C' : '#FFFFFF',
                 fontWeight: 'bold',
                 '&:hover': {
-                  boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+                  boxShadow: `0 4px 12px ${theme.palette.primary.main}40`,
                 },
                 transition: 'all 0.3s ease',
               }}
@@ -190,8 +189,11 @@ const TopBar = ({ sidebarOpen }) => {
             sx={{
               '& .MuiPaper-root': {
                 borderRadius: '12px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                boxShadow: theme.palette.mode === 'dark' 
+                  ? '0 4px 20px rgba(0,0,0,0.3)' 
+                  : '0 4px 20px rgba(0,0,0,0.15)',
                 mt: 1,
+                backgroundColor: theme.palette.background.paper,
               },
             }}
           >
@@ -199,7 +201,7 @@ const TopBar = ({ sidebarOpen }) => {
               onClick={handleProfileMenuClose}
               sx={{
                 '&:hover': {
-                  backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                  backgroundColor: `${theme.palette.primary.main}20`,
                 },
               }}
             >
@@ -212,7 +214,7 @@ const TopBar = ({ sidebarOpen }) => {
               onClick={handleProfileMenuClose}
               sx={{
                 '&:hover': {
-                  backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                  backgroundColor: `${theme.palette.primary.main}20`,
                 },
               }}
             >
@@ -225,8 +227,8 @@ const TopBar = ({ sidebarOpen }) => {
               onClick={handleLogout}
               sx={{
                 '&:hover': {
-                  backgroundColor: 'rgba(244, 67, 54, 0.1)',
-                  color: '#F44336',
+                  backgroundColor: `${theme.palette.error.main}20`,
+                  color: theme.palette.error.main,
                 },
               }}
             >

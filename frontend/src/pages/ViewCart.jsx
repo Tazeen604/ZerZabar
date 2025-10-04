@@ -28,6 +28,7 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
+import PageContainer from "../components/PageContainer";
 
 const ViewCart = () => {
   const navigate = useNavigate();
@@ -111,9 +112,8 @@ const ViewCart = () => {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", background: "#f8f9fa" }}>
-      <Box sx={{ py: 4, px: { xs: 2, sm: 4, md: 8 } }}>
-        <Grid container spacing={4}>
+    <PageContainer maxWidth="lg" sx={{ background: "#f8f9fa", minHeight: "100vh" }}>
+      <Grid container spacing={4}>
           {/* Left Half - Product Images Gallery */}
           <Grid item xs={12} md={6}>
             <Card sx={{ height: '100%', overflow: 'hidden' }}>
@@ -220,7 +220,13 @@ const ViewCart = () => {
 
           {/* Right Half - Cart Details */}
           <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%' }}>
+            <Card sx={{ 
+              height: '100%',
+              position: { md: 'sticky' },
+              top: { md: 100 }, // Below navbar
+              maxHeight: { md: 'calc(100vh - 120px)' },
+              overflow: { md: 'auto' }
+            }}>
               <CardContent sx={{ p: 3 }}>
                 {/* Cart Header */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -253,11 +259,12 @@ const ViewCart = () => {
                         {/* Product Image */}
                         <Box
                           sx={{
-                            width: 80,
-                            height: 80,
+                            width: 120,
+                            height: 120,
                             borderRadius: '8px',
                             overflow: 'hidden',
                             backgroundColor: '#f5f5f5',
+                            flexShrink: 0,
                           }}
                         >
                           {item.image ? (
@@ -440,8 +447,7 @@ const ViewCart = () => {
             </Card>
           </Grid>
         </Grid>
-      </Box>
-    </Box>
+    </PageContainer>
   );
 };
 

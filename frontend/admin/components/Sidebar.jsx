@@ -22,6 +22,8 @@ import {
   ChevronRight,
   ExpandMore,
   ExpandLess,
+  Add,
+  BarChart,
 } from '@mui/icons-material';
 
 const Sidebar = ({ open, onToggle }) => {
@@ -37,13 +39,19 @@ const Sidebar = ({ open, onToggle }) => {
       hasSubmenu: false,
     },
     {
+      text: 'Add Product',
+      icon: <Add />,
+      path: '/admin/add-product',
+      hasSubmenu: false,
+    },
+    {
       text: 'Products',
       icon: <Inventory />,
       path: '/admin/products',
       hasSubmenu: true,
       subItems: [
-        { text: 'All Products', path: '/admin/products' },
         { text: 'Product Management', path: '/admin/product-management' },
+        { text: 'Add Category', path: '/admin/add-category' },
         { text: 'Category Management', path: '/admin/category-management' },
       ],
     },
@@ -68,6 +76,12 @@ const Sidebar = ({ open, onToggle }) => {
         { text: 'Pending Orders', path: '/admin/orders/pending' },
         { text: 'Completed Orders', path: '/admin/orders/completed' },
       ],
+    },
+    {
+      text: 'Reports',
+      icon: <BarChart />,
+      path: '/admin/reports',
+      hasSubmenu: false,
     },
   ];
 

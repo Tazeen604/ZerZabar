@@ -61,6 +61,9 @@ const Login = () => {
         localStorage.setItem('admin_token', response.data.token);
         localStorage.setItem('admin_user', JSON.stringify(response.data.user));
         
+        // Update API service token
+        apiService.setToken(response.data.token);
+        
         console.log('Login successful, navigating to dashboard');
         // Reload the page to trigger authentication check
         window.location.href = '/admin/dashboard';

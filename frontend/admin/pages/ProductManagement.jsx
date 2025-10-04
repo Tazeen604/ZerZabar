@@ -33,6 +33,11 @@ import {
   TablePagination,
   Avatar,
   Tooltip,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
+  FormLabel,
+  Divider,
 } from '@mui/material';
 import {
   Add,
@@ -48,11 +53,46 @@ import {
   CloudUpload,
   Undo,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import apiService from '../../src/services/api';
 
+// Standard size options for ecommerce
+const SIZE_OPTIONS = {
+  clothing: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
+  bottoms: ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'],
+  shoes: ['6', '7', '8', '9', '10', '11', '12', '13'],
+  accessories: ['Standard Size', 'One Size', 'Small', 'Medium', 'Large']
+};
+
+// Standard color options with hex codes
+const COLOR_OPTIONS = [
+  { name: 'Black', hex: '#000000' },
+  { name: 'White', hex: '#FFFFFF' },
+  { name: 'Red', hex: '#FF0000' },
+  { name: 'Blue', hex: '#0000FF' },
+  { name: 'Green', hex: '#008000' },
+  { name: 'Yellow', hex: '#FFFF00' },
+  { name: 'Orange', hex: '#FFA500' },
+  { name: 'Purple', hex: '#800080' },
+  { name: 'Pink', hex: '#FFC0CB' },
+  { name: 'Brown', hex: '#A52A2A' },
+  { name: 'Gray', hex: '#808080' },
+  { name: 'Navy', hex: '#000080' },
+  { name: 'Maroon', hex: '#800000' },
+  { name: 'Teal', hex: '#008080' },
+  { name: 'Cream', hex: '#F5F5DC' },
+  { name: 'Beige', hex: '#F5F5DC' },
+  { name: 'Khaki', hex: '#F0E68C' },
+  { name: 'Burgundy', hex: '#800020' },
+  { name: 'Royal Blue', hex: '#4169E1' },
+  { name: 'Forest Green', hex: '#228B22' }
+];
+
 const ProductManagement = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -72,6 +112,7 @@ const ProductManagement = () => {
     sale_price: '',
     stock_quantity: '',
     category_id: '',
+    subcategory_id: '',
     attributes: {},
     sizes: [],
     colors: [],
@@ -83,6 +124,9 @@ const ProductManagement = () => {
   const [imagesToDelete, setImagesToDelete] = useState([]);
   const [originalProductData, setOriginalProductData] = useState(null);
   const [formErrors, setFormErrors] = useState({});
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [selectedColors, setSelectedColors] = useState([]);
+  const [sizeCategory, setSizeCategory] = useState('clothing');
 
   useEffect(() => {
     fetchProducts();
@@ -127,6 +171,23 @@ const ProductManagement = () => {
     }
   };
 
+  const fetchSubcategories = async (categoryId) => {
+    try {
+      if (!categoryId) {
+        setSubcategories([]);
+        return;
+      }
+      const response = await apiService.get(`/admin/subcategories?category_id=${categoryId}`);
+      console.log('Subcategories response:', response);
+      const subcategoriesData = response.data?.data || response.data || [];
+      console.log('Subcategories data:', subcategoriesData);
+      setSubcategories(Array.isArray(subcategoriesData) ? subcategoriesData : []);
+    } catch (err) {
+      console.error('Error fetching subcategories:', err);
+      setSubcategories([]);
+    }
+  };
+
   const handleCreateProduct = () => {
     setEditingProduct(null);
     setProductForm({
@@ -137,6 +198,7 @@ const ProductManagement = () => {
       sale_price: '',
       stock_quantity: '',
       category_id: '',
+      subcategory_id: '',
       attributes: {},
       sizes: [],
       colors: [],
@@ -145,6 +207,9 @@ const ProductManagement = () => {
       images: [],
     });
     setSelectedImages([]);
+    setSelectedSizes([]); // Reset selected sizes
+    setSelectedColors([]); // Reset selected colors
+    setSizeCategory('clothing'); // Reset size category
     setFormErrors({});
     setOpenDialog(true);
   };
@@ -152,8 +217,19 @@ const ProductManagement = () => {
 
 
   const handleEditProduct = (product) => {
+    console.log('Editing product:', product);
+    console.log('Product category_id:', product.category_id, typeof product.category_id);
+    console.log('Product sizes:', product.sizes, typeof product.sizes);
+    console.log('Product colors:', product.colors, typeof product.colors);
+    console.log('Product images:', product.images, typeof product.images);
+    
     setEditingProduct(product);
     setOriginalProductData(product); // Store original data for undo functionality
+    
+    // Ensure category_id is a number
+    const categoryId = product.category_id ? parseInt(product.category_id) : '';
+    const subcategoryId = product.subcategory_id ? parseInt(product.subcategory_id) : '';
+    
     setProductForm({
       name: product.name,
       description: product.description || '',
@@ -161,7 +237,8 @@ const ProductManagement = () => {
       price: product.price,
       sale_price: product.sale_price || '',
       stock_quantity: product.stock_quantity,
-      category_id: product.category_id,
+      category_id: categoryId,
+      subcategory_id: subcategoryId,
       attributes: product.attributes || {},
       sizes: product.sizes || [],
       colors: product.colors || [],
@@ -171,6 +248,18 @@ const ProductManagement = () => {
     });
     setImagesToDelete([]); // Reset deleted images
     setSelectedImages([]); // Reset new images
+    // Ensure sizes and colors are arrays
+    const productSizes = Array.isArray(product.sizes) ? product.sizes : [];
+    const productColors = Array.isArray(product.colors) ? product.colors : [];
+    
+    setSelectedSizes(productSizes); // Set selected sizes
+    setSelectedColors(productColors); // Set selected colors
+    
+    // Fetch subcategories for the selected category
+    if (categoryId) {
+      fetchSubcategories(categoryId);
+    }
+    
     setOpenDialog(true);
   };
 
@@ -208,6 +297,9 @@ const ProductManagement = () => {
       }
       formData.append('stock_quantity', parseInt(productForm.stock_quantity));
       formData.append('category_id', productForm.category_id);
+      if (productForm.subcategory_id) {
+        formData.append('subcategory_id', productForm.subcategory_id);
+      }
       formData.append('is_active', productForm.is_active ? '1' : '0');
       formData.append('is_featured', productForm.is_featured ? '1' : '0');
       
@@ -228,14 +320,16 @@ const ProductManagement = () => {
         formData.append('attributes', JSON.stringify(productForm.attributes));
       }
 
-      // Add sizes as JSON string
-      if (productForm.sizes && productForm.sizes.length > 0) {
-        formData.append('sizes', JSON.stringify(productForm.sizes));
+      // Add sizes as JSON string - ensure it's an array
+      const sizesArray = Array.isArray(productForm.sizes) ? productForm.sizes : [];
+      if (sizesArray.length > 0) {
+        formData.append('sizes', JSON.stringify(sizesArray));
       }
 
-      // Add colors as JSON string
-      if (productForm.colors && productForm.colors.length > 0) {
-        formData.append('colors', JSON.stringify(productForm.colors));
+      // Add colors as JSON string - ensure it's an array
+      const colorsArray = Array.isArray(productForm.colors) ? productForm.colors : [];
+      if (colorsArray.length > 0) {
+        formData.append('colors', JSON.stringify(colorsArray));
       }
 
       // Add images to delete for updates
@@ -385,9 +479,9 @@ const ProductManagement = () => {
     }
     
     if (productForm.sale_price && productForm.sale_price > 0) {
-      if (productForm.sale_price >= productForm.price) {
+      if (parseFloat(productForm.sale_price) >= parseFloat(productForm.price)) {
         errors.sale_price = '🏷️ Sale price must be less than regular price to offer a discount';
-      } else if (productForm.sale_price <= 0) {
+      } else if (parseFloat(productForm.sale_price) <= 0) {
         errors.sale_price = '🏷️ Sale price must be greater than 0';
       }
     }
@@ -448,6 +542,16 @@ const ProductManagement = () => {
       [field]: value
     }));
     
+    // Handle category change - fetch subcategories and reset subcategory selection
+    if (field === 'category_id') {
+      fetchSubcategories(value);
+      // Reset subcategory when category changes
+      setProductForm(prev => ({
+        ...prev,
+        subcategory_id: ''
+      }));
+    }
+    
     // Clear error for this field when user starts typing
     if (formErrors[field]) {
       setFormErrors(prev => ({
@@ -467,17 +571,53 @@ const ProductManagement = () => {
         ...prev,
         [field]: '📄 Description should be at least 10 characters to be meaningful'
       }));
-    } else if (field === 'price' && value > 0 && value > 1000000) {
+    } else if (field === 'price' && parseFloat(value) > 0 && parseFloat(value) > 1000000) {
       setFormErrors(prev => ({
         ...prev,
         [field]: '💰 Price seems too high. Please verify the amount'
       }));
-    } else if (field === 'sale_price' && value > 0 && productForm.price && value >= productForm.price) {
+    } else if (field === 'sale_price' && parseFloat(value) > 0 && productForm.price && parseFloat(value) >= parseFloat(productForm.price)) {
       setFormErrors(prev => ({
         ...prev,
         [field]: '🏷️ Sale price must be less than regular price to offer a discount'
       }));
     }
+  };
+
+  // Handle size selection
+  const handleSizeChange = (size) => {
+    setSelectedSizes(prev => {
+      const currentSizes = Array.isArray(prev) ? prev : [];
+      const newSizes = currentSizes.includes(size) 
+        ? currentSizes.filter(s => s !== size)
+        : [...currentSizes, size];
+      
+      // Update product form
+      handleFieldChange('sizes', newSizes);
+      return newSizes;
+    });
+  };
+
+  // Handle color selection
+  const handleColorChange = (color) => {
+    setSelectedColors(prev => {
+      const currentColors = Array.isArray(prev) ? prev : [];
+      const newColors = currentColors.includes(color) 
+        ? currentColors.filter(c => c !== color)
+        : [...currentColors, color];
+      
+      // Update product form
+      handleFieldChange('colors', newColors);
+      return newColors;
+    });
+  };
+
+  // Handle size category change
+  const handleSizeCategoryChange = (category) => {
+    setSizeCategory(category);
+    // Clear selected sizes when category changes
+    setSelectedSizes([]);
+    handleFieldChange('sizes', []);
   };
 
   const handleChangePage = (event, newPage) => {
@@ -519,7 +659,7 @@ const ProductManagement = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={handleCreateProduct}
+          onClick={() => navigate('/admin/add-product')}
           sx={{
             backgroundColor: '#FFD700',
             color: '#2C2C2C',
@@ -536,7 +676,6 @@ const ProductManagement = () => {
       <Paper sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab label="All Products" />
-          <Tab label="Categories" />
           <Tab label="Inventory" />
         </Tabs>
       </Paper>
@@ -697,41 +836,18 @@ const ProductManagement = () => {
         </Card>
       )}
 
-      {/* Categories Tab */}
-      {tabValue === 1 && (
-        <Grid container spacing={3}>
-          {(categories || []).map((category) => (
-            <Grid item xs={12} sm={6} md={4} key={category.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
-                    {category.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#757575', mb: 2 }}>
-                    {category.description || 'No description'}
-                  </Typography>
-                  <Chip
-                    label={`${category.products_count || 0} products`}
-                    size="small"
-                    color="primary"
-                  />
-                </CardContent>
-                <CardActions>
-                  <Button size="small" startIcon={<Edit />}>
-                    Edit
-                  </Button>
-                  <Button size="small" color="error" startIcon={<Delete />}>
-                    Delete
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
 
       {/* Product Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
+      <Dialog 
+        open={openDialog} 
+        onClose={(event, reason) => {
+          if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') {
+            setOpenDialog(false);
+          }
+        }}
+        maxWidth="md" 
+        fullWidth
+      >
         <DialogTitle>
           {editingProduct ? 'Edit Product' : 'Add New Product'}
         </DialogTitle>
@@ -830,39 +946,300 @@ const ProductManagement = () => {
                     {formErrors.category_id}
                   </Typography>
                 )}
+                
+                {/* Current Category Display */}
+                <Box sx={{ mt: 2 }}>
+                  {productForm.category_id ? (
+                    <Box sx={{ 
+                      p: 2, 
+                      backgroundColor: '#e8f5e8', 
+                      borderRadius: 1,
+                      border: '1px solid #4CAF50'
+                    }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Selected Category:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#4CAF50' }}>
+                        {categories.find(c => c.id === productForm.category_id)?.name || 'Unknown Category'}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{ 
+                      p: 2, 
+                      textAlign: 'center', 
+                      backgroundColor: '#f5f5f5', 
+                      borderRadius: 1,
+                      border: '1px dashed #ccc'
+                    }}>
+                      <Typography variant="body2" color="text.secondary">
+                        📂 No category selected for this product
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Select a category from the dropdown above
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
               </FormControl>
             </Grid>
             
-            {/* Sizes Field */}
+            {/* Subcategory Selection */}
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Sizes (comma-separated)"
-                placeholder="S, M, L, XL, XXL"
-                value={Array.isArray(productForm.sizes) ? productForm.sizes.join(', ') : ''}
-                onChange={(e) => {
-                  const sizes = e.target.value.split(',').map(s => s.trim()).filter(s => s);
-                  handleFieldChange('sizes', sizes);
-                }}
-                error={!!formErrors.sizes}
-                helperText={formErrors.sizes || "Enter sizes separated by commas"}
-              />
+              <FormControl fullWidth error={!!formErrors.subcategory_id}>
+                <InputLabel>Subcategory</InputLabel>
+                <Select
+                  value={productForm.subcategory_id}
+                  label="Subcategory"
+                  onChange={(e) => handleFieldChange('subcategory_id', e.target.value)}
+                  disabled={!productForm.category_id}
+                >
+                  {(Array.isArray(subcategories) ? subcategories : []).map((subcategory) => (
+                    <MenuItem key={subcategory.id} value={subcategory.id}>
+                      {subcategory.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {formErrors.subcategory_id && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                    {formErrors.subcategory_id}
+                  </Typography>
+                )}
+                
+                {/* Current Subcategory Display */}
+                <Box sx={{ mt: 2 }}>
+                  {productForm.subcategory_id ? (
+                    <Box sx={{ 
+                      p: 2, 
+                      backgroundColor: '#e3f2fd', 
+                      borderRadius: 1,
+                      border: '1px solid #2196F3'
+                    }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Selected Subcategory:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2196F3' }}>
+                        {subcategories.find(s => s.id === productForm.subcategory_id)?.name || 'Unknown Subcategory'}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{ 
+                      p: 2, 
+                      textAlign: 'center', 
+                      backgroundColor: '#f5f5f5', 
+                      borderRadius: 1,
+                      border: '1px dashed #ccc'
+                    }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {!productForm.category_id ? '📂 Please select a category first' : '📂 No subcategory selected for this product'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {!productForm.category_id ? 'Select a category to see available subcategories' : 'Select a subcategory from the dropdown above'}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </FormControl>
             </Grid>
             
-            {/* Colors Field */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Colors (comma-separated)"
-                placeholder="Red, Blue, Green, Black, White"
-                value={Array.isArray(productForm.colors) ? productForm.colors.join(', ') : ''}
-                onChange={(e) => {
-                  const colors = e.target.value.split(',').map(c => c.trim()).filter(c => c);
-                  handleFieldChange('colors', colors);
-                }}
-                error={!!formErrors.colors}
-                helperText={formErrors.colors || "Enter colors separated by commas"}
-              />
+            {/* Size Selection */}
+            <Grid item xs={12}>
+              <FormControl component="fieldset" error={!!formErrors.sizes}>
+                <FormLabel component="legend" sx={{ mb: 2, fontWeight: 600, color: '#333' }}>
+                  Product Sizes
+                </FormLabel>
+                
+                {/* Size Category Selection */}
+                <FormControl sx={{ mb: 3, minWidth: 200 }}>
+                  <InputLabel>Size Category</InputLabel>
+                  <Select
+                    value={sizeCategory}
+                    label="Size Category"
+                    onChange={(e) => handleSizeCategoryChange(e.target.value)}
+                  >
+                    <MenuItem value="clothing">Clothing (XS, S, M, L, XL, XXL, XXXL)</MenuItem>
+                    <MenuItem value="bottoms">Bottoms (28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48)</MenuItem>
+                    <MenuItem value="shoes">Shoes (6, 7, 8, 9, 10, 11, 12, 13)</MenuItem>
+                    <MenuItem value="accessories">Accessories (Standard Size, One Size, Small, Medium, Large)</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {sizeCategory === 'accessories' && (
+                  <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 2 }}>
+                    Use "Standard Size" for accessories like belts, wallets, bags, etc. that don't have specific sizing.
+                  </Typography>
+                )}
+
+                {/* Size Checkboxes */}
+                <FormGroup row>
+                  {SIZE_OPTIONS[sizeCategory].map((size) => (
+                    <FormControlLabel
+                      key={size}
+                      control={
+                        <Checkbox
+                          checked={(selectedSizes || []).includes(size)}
+                          onChange={() => handleSizeChange(size)}
+                          sx={{
+                            '&.Mui-checked': {
+                              color: '#1976d2',
+                            },
+                          }}
+                        />
+                      }
+                      label={size}
+                      sx={{ minWidth: 80 }}
+                    />
+                  ))}
+                </FormGroup>
+                
+                {formErrors.sizes && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                    {formErrors.sizes}
+                  </Typography>
+                )}
+                
+                {/* Selected Sizes Display */}
+                <Box sx={{ mt: 2 }}>
+                  {(selectedSizes || []).length > 0 ? (
+                    <>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Selected Sizes:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {(selectedSizes || []).map((size) => (
+                          <Chip
+                            key={size}
+                            label={size === 'Standard Size' ? `${size} (for accessories)` : size}
+                            onDelete={() => handleSizeChange(size)}
+                            color="primary"
+                            variant="outlined"
+                            size="small"
+                            sx={{
+                              backgroundColor: size === 'Standard Size' ? 'rgba(255, 215, 0, 0.1)' : undefined,
+                              borderColor: size === 'Standard Size' ? '#FFD700' : undefined,
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </>
+                  ) : (
+                    <Box sx={{ 
+                      p: 2, 
+                      textAlign: 'center', 
+                      backgroundColor: '#f5f5f5', 
+                      borderRadius: 1,
+                      border: '1px dashed #ccc'
+                    }}>
+                      <Typography variant="body2" color="text.secondary">
+                        📏 No sizes selected for this product
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Select sizes from the options above
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </FormControl>
+            </Grid>
+            
+            {/* Color Selection */}
+            <Grid item xs={12}>
+              <FormControl component="fieldset" error={!!formErrors.colors}>
+                <FormLabel component="legend" sx={{ mb: 2, fontWeight: 600, color: '#333' }}>
+                  Product Colors
+                </FormLabel>
+                
+                {/* Color Swatches */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+                  {COLOR_OPTIONS.map((color) => (
+                    <Box
+                      key={color.name}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        p: 1,
+                        borderRadius: 2,
+                        border: (selectedColors || []).includes(color.name) ? '2px solid #1976d2' : '2px solid transparent',
+                        backgroundColor: (selectedColors || []).includes(color.name) ? 'rgba(25, 118, 211, 0.1)' : 'transparent',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          backgroundColor: 'rgba(25, 118, 211, 0.05)',
+                          transform: 'scale(1.05)',
+                        },
+                      }}
+                      onClick={() => handleColorChange(color.name)}
+                    >
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          backgroundColor: color.hex,
+                          border: '2px solid #e0e0e0',
+                          mb: 1,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        }}
+                      />
+                      <Typography variant="caption" sx={{ fontSize: '0.75rem', textAlign: 'center' }}>
+                        {color.name}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+                
+                {formErrors.colors && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                    {formErrors.colors}
+                  </Typography>
+                )}
+                
+                {/* Selected Colors Display */}
+                <Box sx={{ mt: 2 }}>
+                  {(selectedColors || []).length > 0 ? (
+                    <>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Selected Colors:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {(selectedColors || []).map((colorName) => {
+                          const color = COLOR_OPTIONS.find(c => c.name === colorName);
+                          return (
+                            <Chip
+                              key={colorName}
+                              label={colorName}
+                              onDelete={() => handleColorChange(colorName)}
+                              sx={{
+                                backgroundColor: color?.hex || '#e0e0e0',
+                                color: color?.hex === '#FFFFFF' || color?.hex === '#F5F5DC' ? '#000' : '#fff',
+                                '& .MuiChip-deleteIcon': {
+                                  color: color?.hex === '#FFFFFF' || color?.hex === '#F5F5DC' ? '#000' : '#fff',
+                                },
+                              }}
+                              size="small"
+                            />
+                          );
+                        })}
+                      </Box>
+                    </>
+                  ) : (
+                    <Box sx={{ 
+                      p: 2, 
+                      textAlign: 'center', 
+                      backgroundColor: '#f5f5f5', 
+                      borderRadius: 1,
+                      border: '1px dashed #ccc'
+                    }}>
+                      <Typography variant="body2" color="text.secondary">
+                        🎨 No colors selected for this product
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Select colors from the options above
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </FormControl>
             </Grid>
             
             <Grid item xs={12}>
@@ -896,13 +1273,15 @@ const ProductManagement = () => {
               )}
               
               {/* Display existing images for edit mode */}
-              {editingProduct && productForm.images && productForm.images.length > 0 && (
+              {editingProduct && (
                 <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Current Images ({productForm.images.length}):
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {productForm.images.map((image, index) => (
+                  {productForm.images && productForm.images.length > 0 ? (
+                    <>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        Current Images ({productForm.images.length}):
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {productForm.images.map((image, index) => (
                       <Box key={`existing-${image.id || index}`} sx={{ position: 'relative' }}>
                         <img
                           src={image.image_path ? `http://localhost:8000/storage/${image.image_path}` : 'https://via.placeholder.com/100x100?text=No+Image'}
@@ -1003,6 +1382,23 @@ const ProductManagement = () => {
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                     Total images after changes: {productForm.images.length + selectedImages.length} (Max: 5)
                   </Typography>
+                    </>
+                  ) : (
+                    <Box sx={{ 
+                      p: 3, 
+                      textAlign: 'center', 
+                      backgroundColor: '#f5f5f5', 
+                      borderRadius: 2,
+                      border: '2px dashed #ccc'
+                    }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        📷 No images attached to this product
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Upload images using the button above
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               )}
 

@@ -3,14 +3,16 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Box } from "@mui/material";
 import Navbar from "./components/Navbar";
 import HeroBanner from "./components/HeroBanner";
+import TrendingCarousel from "./components/TrendingCarousel";
 import NewArrival from "./components/NewArrival";
 import TwoCardSection from "./components/TwoCardSection";
-import ProductCarousel from "./components/ProductCarousel";
+import TodaysDropsCarousel from "./components/TodaysDropsCarousel";
 import Footer from "./components/Footer";
 import ProductView from "./pages/ProductView";
 import ViewCart from "./pages/ViewCart";
 import Shop from "./pages/Shop";
 import Checkout from "./pages/Checkout";
+import Contact from "./pages/Contact";
 import { CartProvider } from "./contexts/CartContext";
 import AdminApp from "../admin/AdminApp";
 
@@ -18,9 +20,10 @@ function HomePage() {
   return (
     <>
       <HeroBanner />
+      <TrendingCarousel />
       <NewArrival />
       <TwoCardSection />
-      <ProductCarousel />
+      <TodaysDropsCarousel />
       <Footer />
     </>
   );
@@ -65,6 +68,12 @@ function App() {
               <>
                 <Navbar />
                 <Checkout />
+              </>
+            } />
+            <Route path="/contact" element={
+              <>
+                <Navbar />
+                <Contact />
               </>
             } />
           </Routes>

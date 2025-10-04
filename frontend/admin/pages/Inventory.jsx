@@ -464,7 +464,16 @@ const Inventory = () => {
       </Menu>
 
       {/* Edit Quantity Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={editDialogOpen} 
+        onClose={(event, reason) => {
+          if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') {
+            setEditDialogOpen(false);
+          }
+        }}
+        maxWidth="sm" 
+        fullWidth
+      >
         <DialogTitle sx={{ fontWeight: 'bold', color: '#212121' }}>
           Edit Quantity
         </DialogTitle>

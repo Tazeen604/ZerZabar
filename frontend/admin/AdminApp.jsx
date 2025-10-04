@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
-import adminTheme from './theme';
+import ErrorBoundary from './components/ErrorBoundary';
+import { ErrorProvider } from './contexts/ErrorContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Dashboard from './pages/Dashboard';
@@ -15,8 +17,12 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ProductManagement from './pages/ProductManagement';
 import CategoryManagement from './pages/CategoryManagement';
+import AddProduct from './pages/AddProduct';
+import AddCategory from './pages/AddCategory';
+import Reports from './pages/Reports';
 
-const AdminApp = () => {
+const AdminAppContent = () => {
+  const { theme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -47,7 +53,7 @@ const AdminApp = () => {
   // Show loading while checking authentication
   if (loading) {
     return (
-      <ThemeProvider theme={adminTheme}>
+      <MuiThemeProvider theme={theme}>
         <CssBaseline />
         <Box sx={{ 
           display: 'flex', 
@@ -57,14 +63,14 @@ const AdminApp = () => {
         }}>
           Loading...
         </Box>
-      </ThemeProvider>
+      </MuiThemeProvider>
     );
   }
 
   // Show login/signup pages if not authenticated
   if (!isAuthenticated) {
     return (
-      <ThemeProvider theme={adminTheme}>
+      <MuiThemeProvider theme={theme}>
         <CssBaseline />
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -73,14 +79,16 @@ const AdminApp = () => {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<Navigate to="/admin/login" replace />} />
         </Routes>
-      </ThemeProvider>
+      </MuiThemeProvider>
     );
   }
 
   return (
-    <ThemeProvider theme={adminTheme}>
-      <CssBaseline />
-      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <ErrorBoundary>
+      <ErrorProvider>
+        <MuiThemeProvider theme={theme}>
+          <CssBaseline />
+          <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* Sidebar */}
         <Sidebar open={sidebarOpen} onToggle={handleSidebarToggle} />
         
@@ -103,7 +111,7 @@ const AdminApp = () => {
             sx={{
               flexGrow: 1,
               mt: 8, // Account for fixed top bar
-              backgroundColor: '#FAFAFA',
+              backgroundColor: theme.palette.background.default,
               minHeight: 'calc(100vh - 64px)',
               overflow: 'auto',
             }}
@@ -111,16 +119,29 @@ const AdminApp = () => {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/add-product" element={<AddProduct />} />
+              <Route path="/add-category" element={<AddCategory />} />
               <Route path="/products" element={<Products />} />
               <Route path="/product-management" element={<ProductManagement />} />
               <Route path="/category-management" element={<CategoryManagement />} />
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/orders" element={<Orders />} />
+              <Route path="/reports" element={<Reports />} />
               <Route path="*" element={<Dashboard />} />
             </Routes>
           </Box>
         </Box>
       </Box>
+        </MuiThemeProvider>
+      </ErrorProvider>
+    </ErrorBoundary>
+  );
+};
+
+const AdminApp = () => {
+  return (
+    <ThemeProvider>
+      <AdminAppContent />
     </ThemeProvider>
   );
 };

@@ -36,7 +36,7 @@ const Signup = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: '',
+    password_confirmation: '',
     phone: '',
     address: '',
     role: 'data_entry',
@@ -65,7 +65,7 @@ const Signup = () => {
     setError('');
 
     // Validation
-    if (formData.password !== formData.confirmPassword) {
+    if (formData.password !== formData.password_confirmation) {
       setError('Passwords do not match');
       setLoading(false);
       return;
@@ -84,6 +84,9 @@ const Signup = () => {
         // Store token and user data
         localStorage.setItem('admin_token', response.data.token);
         localStorage.setItem('admin_user', JSON.stringify(response.data.user));
+        
+        // Update API service token
+        apiService.setToken(response.data.token);
         
         // Navigate to admin dashboard
         navigate('/admin/dashboard');
@@ -273,9 +276,9 @@ const Signup = () => {
             <TextField
               fullWidth
               label="Confirm Password"
-              name="confirmPassword"
+              name="password_confirmation"
               type={showConfirmPassword ? 'text' : 'password'}
-              value={formData.confirmPassword}
+              value={formData.password_confirmation}
               onChange={handleChange}
               required
               sx={{ mb: 3 }}
@@ -346,4 +349,6 @@ const Signup = () => {
 };
 
 export default Signup;
+
+
 

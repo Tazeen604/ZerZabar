@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -27,6 +27,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  CircularProgress,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Search,
@@ -39,7 +42,11 @@ import {
   Cancel,
   Add,
   ShoppingCart,
+  Error,
 } from '@mui/icons-material';
+import apiService from '../../src/services/api';
+import LoadingSkeleton from '../components/LoadingSkeleton';
+import EmptyState from '../components/EmptyState';
 
 const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,93 +56,63 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
 
-  const ordersData = [
-    {
-      id: 'RB5625',
-      date: '29 April 2024',
-      product: 'Laptop',
-      productIcon: '💻',
-      customerName: 'Anna M. Hines',
-      email: 'anna.hines@mail.com',
-      phone: '(+1)-555-1564-261',
-      address: 'Burr Ridge/Illinois',
-      paymentType: 'Credit Card',
-      status: 'Completed',
-      totalPrice: 1299.99,
-      quantity: 1,
-    },
-    {
-      id: 'RB9652',
-      date: '25 April 2024',
-      product: 'Camera',
-      productIcon: '📷',
-      customerName: 'Judith H. Fritsche',
-      email: 'judith.fritsche.com',
-      phone: '(+57)-305-5579-759',
-      address: 'SULLIVAN/Kentucky',
-      paymentType: 'Credit Card',
-      status: 'Completed',
-      totalPrice: 899.99,
-      quantity: 1,
-    },
-    {
-      id: 'RB5984',
-      date: '25 April 2024',
-      product: 'Smartwatch',
-      productIcon: '⌚',
-      customerName: 'Peter T. Smith',
-      email: 'peter.smith@mail.com',
-      phone: '(+33)-655-5187-93',
-      address: 'Yreka/California',
-      paymentType: 'PayPal',
-      status: 'Completed',
-      totalPrice: 399.99,
-      quantity: 1,
-    },
-    {
-      id: 'RB3625',
-      date: '21 April 2024',
-      product: 'Smartphone',
-      productIcon: '📱',
-      customerName: 'Emmanuel J. Delcid',
-      email: 'emmanuel.delicid@mail.com',
-      phone: '(+30)-693-5553-637',
-      address: 'Atlanta/Georgia',
-      paymentType: 'PayPal',
-      status: 'Processing',
-      totalPrice: 799.99,
-      quantity: 1,
-    },
-    {
-      id: 'RB7891',
-      date: '20 April 2024',
-      product: 'Headphones',
-      productIcon: '🎧',
-      customerName: 'Sarah Johnson',
-      email: 'sarah.johnson@mail.com',
-      phone: '(+1)-555-1234-567',
-      address: 'New York/New York',
-      paymentType: 'Credit Card',
-      status: 'Pending',
-      totalPrice: 199.99,
-      quantity: 2,
-    },
-    {
-      id: 'RB4567',
-      date: '18 April 2024',
-      product: 'Tablet',
-      productIcon: '📱',
-      customerName: 'Michael Brown',
-      email: 'michael.brown@mail.com',
-      phone: '(+1)-555-9876-543',
-      address: 'Los Angeles/California',
-      paymentType: 'PayPal',
-      status: 'Cancelled',
-      totalPrice: 599.99,
-      quantity: 1,
-    },
-  ];
+  // Fetch orders from API
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = new URLSearchParams({
+        page: (page + 1).toString(),
+        per_page: rowsPerPage.toString(),
+      });
+      
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+      
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+      
+      const response = await apiService.get(`/admin/orders?${params.toString()}`);
+      
+      if (response.success) {
+        setOrders(response.data?.data || []);
+        setTotalCount(response.data?.total || 0);
+      } else {
+        setError(response.message || 'Failed to fetch orders');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to fetch orders');
+      console.error('Error fetching orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch orders when component mounts or filters change
+  useEffect(() => {
+    fetchOrders();
+  }, [page, rowsPerPage, searchTerm, statusFilter]);
+
+  // Debounced search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm !== '') {
+        setPage(0);
+        fetchOrders();
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   const handleMenuOpen = (event, order) => {
     setAnchorEl(event.currentTarget);
@@ -157,20 +134,36 @@ const Orders = () => {
     handleMenuClose();
   };
 
-  const handleUpdateStatus = (newStatus) => {
-    console.log('Update status:', selectedOrder.id, newStatus);
+  const handleUpdateStatus = async (newStatus) => {
+    try {
+      const response = await apiService.put(`/admin/orders/${selectedOrder.id}`, {
+        status: newStatus.toLowerCase()
+      });
+      
+      if (response.success) {
+        setSuccess(`Order status updated to ${newStatus}`);
+        fetchOrders(); // Refresh the orders list
+      } else {
+        setError(response.message || 'Failed to update order status');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to update order status');
+    }
     handleMenuClose();
   };
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'Completed':
+    switch (status?.toLowerCase()) {
+      case 'completed':
+      case 'delivered':
         return '#4CAF50';
-      case 'Processing':
+      case 'processing':
+      case 'shipped':
         return '#FF9800';
-      case 'Pending':
+      case 'pending':
         return '#2196F3';
-      case 'Cancelled':
+      case 'cancelled':
+      case 'canceled':
         return '#F44336';
       default:
         return '#757575';
@@ -178,30 +171,42 @@ const Orders = () => {
   };
 
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'Completed':
+    switch (status?.toLowerCase()) {
+      case 'completed':
+      case 'delivered':
         return <CheckCircle />;
-      case 'Processing':
+      case 'processing':
+      case 'shipped':
         return <LocalShipping />;
-      case 'Pending':
+      case 'pending':
         return <Pending />;
-      case 'Cancelled':
+      case 'cancelled':
+      case 'canceled':
         return <Cancel />;
       default:
         return <ShoppingCart />;
     }
   };
 
-  const filteredData = ordersData.filter(order => {
-    const matchesSearch = 
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || order.status.toLowerCase() === statusFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus;
-  });
+  // Loading and error states
+  if (loading && orders.length === 0) {
+    return <LoadingSkeleton type="dashboard" />;
+  }
+
+  if (error && orders.length === 0) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <EmptyState
+          icon={<Error />}
+          title="Failed to Load Orders"
+          description={error}
+          actionLabel="Retry"
+          onAction={fetchOrders}
+          variant="error"
+        />
+      </Box>
+    );
+  }
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -238,7 +243,7 @@ const Orders = () => {
             py: 1.5,
           }}
         >
-          + Create Order
+          Create Order
         </Button>
       </Box>
 
@@ -286,6 +291,8 @@ const Orders = () => {
             <MenuItem value="all">All Status</MenuItem>
             <MenuItem value="pending">Pending</MenuItem>
             <MenuItem value="processing">Processing</MenuItem>
+            <MenuItem value="shipped">Shipped</MenuItem>
+            <MenuItem value="delivered">Delivered</MenuItem>
             <MenuItem value="completed">Completed</MenuItem>
             <MenuItem value="cancelled">Cancelled</MenuItem>
           </Select>
@@ -310,9 +317,8 @@ const Orders = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredData
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((order) => (
+            {orders && orders.length > 0 ? (
+              orders.map((order) => (
                 <TableRow
                   key={order.id}
                   sx={{
@@ -325,44 +331,46 @@ const Orders = () => {
                   }}
                 >
                   <TableCell sx={{ fontWeight: 'bold', color: '#FFD700' }}>
-                    #{order.id}
+                    #{order.order_number || order.id}
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ color: '#757575' }}>
-                      {order.date}
+                      {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontSize: '1.2rem' }}>{order.productIcon}</Typography>
+                      <Typography sx={{ fontSize: '1.2rem' }}>🛍️</Typography>
                       <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {order.product}
+                        {order.items?.length || 0} items
                       </Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                      {order.customerName}
+                      {order.customer_name || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ color: '#757575' }}>
-                      {order.email}
+                      {order.customer_email || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ color: '#757575' }}>
-                      {order.phone}
+                      {order.customer_phone || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ color: '#757575' }}>
-                      {order.address}
+                      {typeof order.shipping_address === 'string' 
+                        ? order.shipping_address.substring(0, 30) + '...' 
+                        : 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={order.paymentType}
+                      label={order.payment_method || 'N/A'}
                       size="small"
                       sx={{
                         backgroundColor: '#E3F2FD',
@@ -374,7 +382,7 @@ const Orders = () => {
                   <TableCell>
                     <Chip
                       icon={getStatusIcon(order.status)}
-                      label={order.status}
+                      label={order.status || 'Unknown'}
                       size="small"
                       sx={{
                         backgroundColor: getStatusColor(order.status) + '20',
@@ -397,13 +405,25 @@ const Orders = () => {
                     </IconButton>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={10} sx={{ textAlign: 'center', py: 4 }}>
+                  <EmptyState
+                    icon={<ShoppingCart />}
+                    title="No Orders Found"
+                    description="No orders match your current filters. Try adjusting your search criteria."
+                    size="small"
+                  />
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={filteredData.length}
+          count={totalCount}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
@@ -487,9 +507,18 @@ const Orders = () => {
       </Menu>
 
       {/* Order Details Dialog */}
-      <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog 
+        open={viewDialogOpen} 
+        onClose={(event, reason) => {
+          if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') {
+            setViewDialogOpen(false);
+          }
+        }}
+        maxWidth="md" 
+        fullWidth
+      >
         <DialogTitle sx={{ fontWeight: 'bold', color: '#212121' }}>
-          Order Details - #{selectedOrder?.id}
+          Order Details - #{selectedOrder?.order_number || selectedOrder?.id}
         </DialogTitle>
         <DialogContent>
           {selectedOrder && (
@@ -501,16 +530,16 @@ const Orders = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     <Typography variant="body2">
-                      <strong>Name:</strong> {selectedOrder.customerName}
+                      <strong>Name:</strong> {selectedOrder.customer_name || 'N/A'}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Email:</strong> {selectedOrder.email}
+                      <strong>Email:</strong> {selectedOrder.customer_email || 'N/A'}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Phone:</strong> {selectedOrder.phone}
+                      <strong>Phone:</strong> {selectedOrder.customer_phone || 'N/A'}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Address:</strong> {selectedOrder.address}
+                      <strong>Address:</strong> {selectedOrder.shipping_address || 'N/A'}
                     </Typography>
                   </Box>
                 </Grid>
@@ -520,22 +549,22 @@ const Orders = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     <Typography variant="body2">
-                      <strong>Order ID:</strong> #{selectedOrder.id}
+                      <strong>Order ID:</strong> #{selectedOrder.order_number || selectedOrder.id}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Date:</strong> {selectedOrder.date}
+                      <strong>Date:</strong> {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleDateString() : 'N/A'}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Product:</strong> {selectedOrder.product}
+                      <strong>Items:</strong> {selectedOrder.items?.length || 0} items
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Quantity:</strong> {selectedOrder.quantity}
+                      <strong>Status:</strong> {selectedOrder.status || 'Unknown'}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Payment:</strong> {selectedOrder.paymentType}
+                      <strong>Payment:</strong> {selectedOrder.payment_method || 'N/A'}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Total:</strong> ${selectedOrder.totalPrice}
+                      <strong>Total:</strong> PKR {selectedOrder.total_amount?.toLocaleString() || '0'}
                     </Typography>
                   </Box>
                 </Grid>
@@ -564,6 +593,28 @@ const Orders = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={!!success}
+        autoHideDuration={6000}
+        onClose={() => setSuccess('')}
+      >
+        <Alert onClose={() => setSuccess('')} severity="success">
+          {success}
+        </Alert>
+      </Snackbar>
+
+      {/* Error Snackbar */}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError('')}
+      >
+        <Alert onClose={() => setError('')} severity="error">
+          {error}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

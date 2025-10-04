@@ -18,6 +18,7 @@ import {
   TableRow,
   CircularProgress,
   Alert,
+  Paper,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -31,23 +32,39 @@ import {
   Add,
   CheckCircle,
   Pending,
+  Warning,
+  TrendingFlat,
 } from '@mui/icons-material';
 import apiService from '../../src/services/api';
+import { useApi } from '../hooks/useApi';
+import LoadingSkeleton from '../components/LoadingSkeleton';
+import EmptyState from '../components/EmptyState';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Dashboard = () => {
+  const { theme } = useTheme();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [salesSummary, setSalesSummary] = useState([]);
 
   useEffect(() => {
-    fetchDashboardData();
+    const loadDashboardData = async () => {
+      await fetchDashboardData();
+      const activities = await fetchRecentActivities();
+      const sales = await fetchSalesSummary();
+      setRecentActivities(activities);
+      setSalesSummary(sales);
+    };
+    loadDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Use the new dashboard API endpoint
-      const response = await apiService.getDashboard();
+      // Fetch dashboard stats from the new API endpoint
+      const response = await apiService.get('/admin/reports/dashboard-stats');
       
       if (response.success) {
         setDashboardData(response.data);
@@ -61,91 +78,160 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch recent activities (real data)
+  const fetchRecentActivities = async () => {
+    try {
+      const [ordersResponse, paymentsResponse] = await Promise.all([
+        apiService.get('/admin/orders?limit=5'),
+        apiService.get('/admin/payments?limit=5')
+      ]);
+      
+      const activities = [];
+      
+      // Add recent orders
+      if (ordersResponse.success && ordersResponse.data?.data) {
+        ordersResponse.data.data.forEach(order => {
+          activities.push({
+            id: `order-${order.id}`,
+            type: 'order',
+            message: `New order #${order.order_number} received`,
+            time: new Date(order.created_at).toLocaleString(),
+            status: 'success',
+            orderId: order.id
+          });
+        });
+      }
+      
+      // Add recent payments
+      if (paymentsResponse.success && paymentsResponse.data?.data) {
+        paymentsResponse.data.data.forEach(payment => {
+          activities.push({
+            id: `payment-${payment.id}`,
+            type: 'payment',
+            message: `Payment received for order #${payment.order_number}`,
+            time: new Date(payment.created_at).toLocaleString(),
+            status: 'success',
+            amount: payment.amount
+          });
+        });
+      }
+      
+      // Sort by time and take latest 10
+      return activities
+        .sort((a, b) => new Date(b.time) - new Date(a.time))
+        .slice(0, 10);
+    } catch (err) {
+      console.error('Error fetching recent activities:', err);
+      return [];
+    }
+  };
+
+  // Fetch sales summary data
+  const fetchSalesSummary = async () => {
+    try {
+      const response = await apiService.get('/admin/reports/sales?period=daily&days=7');
+      if (response.success && response.data?.report_data) {
+        return response.data.report_data.map(item => ({
+          day: new Date(item.period).toLocaleDateString('en-US', { weekday: 'long' }),
+          date: new Date(item.period).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          }),
+          revenue: item.total_revenue || 0,
+          orders: item.orders_count || 0
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching sales summary:', err);
+    }
+    return [];
+  };
+
+  // Default values for when data is null/undefined
+  const getDefaultData = () => ({
+    this_month: {
+      revenue: 0,
+      orders: 0,
+      customers: 0,
+    },
+    last_month: {
+      revenue: 0,
+      orders: 0,
+    },
+    growth: {
+      revenue_growth: 0,
+      orders_growth: 0,
+    },
+    inventory: {
+      total_products: 0,
+      low_stock: 0,
+      out_of_stock: 0,
+    },
+    recent_orders: [],
+    top_products: [],
+  });
+
+  const data = dashboardData || getDefaultData();
+
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingSkeleton type="dashboard" />;
   }
 
   if (error) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">{error}</Alert>
+        <EmptyState
+          icon={<Error />}
+          title="Failed to Load Dashboard"
+          description={error}
+          actionLabel="Retry"
+          onAction={fetchDashboardData}
+          variant="error"
+        />
       </Box>
     );
   }
 
   const statsData = [
     {
-      title: 'Total Products',
-      value: dashboardData?.stats?.total_products || 0,
-      change: `${dashboardData?.stats?.active_products || 0} active`,
+      title: 'Today\'s Orders',
+      value: data.today?.orders || 0,
+      change: `Revenue: PKR ${(data.today?.revenue || 0).toLocaleString()}`,
       changeType: 'positive',
-      icon: <Assessment />,
+      icon: <ShoppingCart />,
       color: '#4CAF50',
       bgColor: '#E8F5E8',
     },
     {
-      title: 'Total Revenue',
-      value: `₨${dashboardData?.stats?.total_revenue || 0}`,
-      change: `Avg: ₨${dashboardData?.stats?.average_price || 0}`,
+      title: 'This Month Revenue',
+      value: `PKR ${(data.this_month?.revenue || 0).toLocaleString()}`,
+      change: `${data.this_month?.orders || 0} orders`,
       changeType: 'positive',
       icon: <AttachMoney />,
       color: '#2196F3',
       bgColor: '#E3F2FD',
     },
     {
-      title: 'Low Stock Products',
-      value: dashboardData?.stats?.low_stock_products || 0,
-      change: `${dashboardData?.stats?.out_of_stock_products || 0} out of stock`,
-      changeType: 'negative',
-      icon: <Inventory />,
+      title: 'Low Stock Items',
+      value: data.inventory?.low_stock || 0,
+      change: `${data.inventory?.out_of_stock || 0} out of stock`,
+      changeType: data.inventory?.low_stock > 0 ? 'negative' : 'positive',
+      icon: <Warning />,
       color: '#FF9800',
       bgColor: '#FFF3E0',
     },
     {
-      title: 'Featured Products',
-      value: dashboardData?.stats?.featured_products || 0,
-      change: `${dashboardData?.categories?.total_categories || 0} categories`,
-      changeType: 'positive',
-      icon: <TrendingUp />,
-      color: '#9C27B0',
-      bgColor: '#F3E5F5',
+      title: 'Growth Rate',
+      value: `${data.growth?.revenue_growth || 0}%`,
+      change: `Orders: ${data.growth?.orders_growth || 0}%`,
+      changeType: data.growth?.revenue_growth >= 0 ? 'positive' : 'negative',
+      icon: data.growth?.revenue_growth >= 0 ? <TrendingUp /> : <TrendingDown />,
+      color: data.growth?.revenue_growth >= 0 ? '#4CAF50' : '#F44336',
+      bgColor: data.growth?.revenue_growth >= 0 ? '#E8F5E8' : '#FFEBEE',
     },
   ];
 
-  const recentActivities = [
-    {
-      id: 1,
-      type: 'order',
-      message: 'New order #RB5625 received',
-      time: '2 minutes ago',
-      status: 'success',
-    },
-    {
-      id: 2,
-      type: 'inventory',
-      message: 'Low stock alert for Product A',
-      time: '15 minutes ago',
-      status: 'warning',
-    },
-    {
-      id: 3,
-      type: 'customer',
-      message: 'New customer registered',
-      time: '1 hour ago',
-      status: 'info',
-    },
-    {
-      id: 4,
-      type: 'payment',
-      message: 'Payment received for order #RB9652',
-      time: '2 hours ago',
-      status: 'success',
-    },
-  ];
 
   const topProducts = [
     { name: 'Premium T-Shirt', sales: 245, revenue: '$2,450' },
@@ -158,10 +244,10 @@ const Dashboard = () => {
     <Box sx={{ p: 3 }}>
       {/* Welcome Section */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#212121', mb: 1 }}>
+        <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, mb: 1 }}>
           Welcome to Zer Zabar Admin
         </Typography>
-        <Typography variant="body1" sx={{ color: '#757575' }}>
+        <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
           Here's what's happening with your store today.
         </Typography>
       </Box>
@@ -169,8 +255,8 @@ const Dashboard = () => {
       {/* Alert Banner */}
       <Box
         sx={{
-          backgroundColor: '#FFF3E0',
-          border: '1px solid #FFB74D',
+          backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#FFF3E0',
+          border: `1px solid ${theme.palette.warning.main}`,
           borderRadius: '8px',
           p: 2,
           mb: 4,
@@ -179,14 +265,14 @@ const Dashboard = () => {
           gap: 2,
         }}
       >
-        <Avatar sx={{ backgroundColor: '#FF9800' }}>
+        <Avatar sx={{ backgroundColor: theme.palette.warning.main }}>
           <Assessment />
         </Avatar>
         <Box>
-          <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#E65100' }}>
+          <Typography variant="body1" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
             System Notice
           </Typography>
-          <Typography variant="body2" sx={{ color: '#BF360C' }}>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
             We regret to inform you that our server is currently experiencing technical difficulties.
           </Typography>
         </Box>
@@ -211,10 +297,10 @@ const Dashboard = () => {
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                   <Box>
-                    <Typography variant="body2" sx={{ color: '#757575', mb: 1 }}>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 1 }}>
                       {stat.title}
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#212121' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                       {stat.value}
                     </Typography>
                   </Box>
@@ -232,14 +318,14 @@ const Dashboard = () => {
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   {stat.changeType === 'positive' ? (
-                    <TrendingUp sx={{ color: '#4CAF50', fontSize: 20 }} />
+                    <TrendingUp sx={{ color: theme.palette.success.main, fontSize: 20 }} />
                   ) : (
-                    <TrendingDown sx={{ color: '#F44336', fontSize: 20 }} />
+                    <TrendingDown sx={{ color: theme.palette.error.main, fontSize: 20 }} />
                   )}
                   <Typography
                     variant="body2"
                     sx={{
-                      color: stat.changeType === 'positive' ? '#4CAF50' : '#F44336',
+                      color: stat.changeType === 'positive' ? theme.palette.success.main : theme.palette.error.main,
                       fontWeight: 'bold',
                     }}
                   >
@@ -252,11 +338,11 @@ const Dashboard = () => {
                 <Button
                   size="small"
                   sx={{
-                    color: '#757575',
+                    color: theme.palette.text.secondary,
                     textTransform: 'none',
                     '&:hover': {
-                      color: '#FFD700',
-                      backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                      color: theme.palette.primary.main,
+                      backgroundColor: `${theme.palette.primary.main}20`,
                     },
                   }}
                 >
@@ -268,11 +354,105 @@ const Dashboard = () => {
         ))}
       </Grid>
 
+      {/* Analytics Section */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {/* Sales Summary */}
+        <Grid item xs={12} lg={8}>
+          <Card sx={{ height: '400px' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
+                Sales Summary (Last 7 Days)
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '300px', overflowY: 'auto' }}>
+                {salesSummary && salesSummary.length > 0 ? (
+                  salesSummary.map((item, index) => (
+                    <Box key={index} sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      p: 2,
+                      backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
+                      borderRadius: 1,
+                      '&:hover': { backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD' }
+                    }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{item.day}</Typography>
+                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>{item.date}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 3 }}>
+                        <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontWeight: 'bold' }}>
+                          PKR {item.revenue.toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
+                          {item.orders} orders
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <EmptyState
+                      icon={<Assessment />}
+                      title="No Sales Data"
+                      description="No sales data available for the last 7 days."
+                      size="small"
+                    />
+                  </Box>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Top Products */}
+        <Grid item xs={12} lg={4}>
+          <Card sx={{ height: '400px' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
+                Top Selling Products
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '300px', overflowY: 'auto' }}>
+                {data.top_products && data.top_products.length > 0 ? (
+                  data.top_products.map((product, index) => (
+                  <Box key={index} sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    p: 2,
+                    backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
+                    borderRadius: 1,
+                    '&:hover': { backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD' }
+                  }}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{product.product_name}</Typography>
+                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                        {product.total_sold} sold
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
+                      PKR {product.total_revenue?.toLocaleString() || '0'}
+                    </Typography>
+                  </Box>
+                  ))
+                ) : (
+                  <EmptyState
+                    icon={<Assessment />}
+                    title="No Products Yet"
+                    description="No product sales data available. Start adding products to see analytics."
+                    size="small"
+                  />
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
       {/* Recent Orders Section */}
       <Card sx={{ mb: 4 }}>
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#212121' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
               Recent Orders
             </Typography>
             <Button
@@ -288,40 +468,41 @@ const Dashboard = () => {
                 py: 1,
               }}
             >
-              + Create Order
+              Create Order
             </Button>
           </Box>
           
           <TableContainer>
             <Table>
-              <TableHead sx={{ backgroundColor: '#F8F9FA' }}>
+              <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Order ID</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Date</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Product</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Customer Name</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Email ID</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Phone No.</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Address</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Payment Type</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Order ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Product</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Customer Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Email ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Phone No.</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Address</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Payment Type</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(dashboardData?.recent_orders || []).map((order) => (
+                {data.recent_orders && data.recent_orders.length > 0 ? (
+                  data.recent_orders.map((order) => (
                   <TableRow
                     key={order.id}
                     sx={{
                       '&:hover': {
-                        backgroundColor: '#F8F9FA',
+                        backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
                       },
                     }}
                   >
-                    <TableCell sx={{ fontWeight: 'bold', color: '#FFD700' }}>
+                    <TableCell sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
                       #{order.order_number}
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ color: '#757575' }}>
+                      <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                         {new Date(order.created_at).toLocaleDateString()}
                       </Typography>
                     </TableCell>
@@ -335,22 +516,22 @@ const Dashboard = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {order.user?.name || 'N/A'}
+                        {order.customer_name || 'N/A'}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ color: '#757575' }}>
-                        {order.user?.email || 'N/A'}
+                      <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                        {order.customer_email || 'N/A'}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ color: '#757575' }}>
-                        {order.billing_address?.phone || 'N/A'}
+                      <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                        {order.customer_phone || 'N/A'}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ color: '#757575' }}>
-                        {order.billing_address?.address || 'N/A'}
+                      <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                        {typeof order.shipping_address === 'string' ? order.shipping_address.substring(0, 30) + '...' : 'N/A'}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -358,8 +539,8 @@ const Dashboard = () => {
                         label={order.payment_method || 'N/A'}
                         size="small"
                         sx={{
-                          backgroundColor: '#E3F2FD',
-                          color: '#2196F3',
+                          backgroundColor: `${theme.palette.primary.main}20`,
+                          color: theme.palette.primary.main,
                           fontWeight: 'bold',
                         }}
                       />
@@ -370,14 +551,26 @@ const Dashboard = () => {
                         label={order.status}
                         size="small"
                         sx={{
-                          backgroundColor: order.status === 'delivered' ? '#E8F5E8' : '#FFF3E0',
-                          color: order.status === 'delivered' ? '#4CAF50' : '#FF9800',
+                          backgroundColor: order.status === 'delivered' ? `${theme.palette.success.main}20` : `${theme.palette.warning.main}20`,
+                          color: order.status === 'delivered' ? theme.palette.success.main : theme.palette.warning.main,
                           fontWeight: 'bold',
                         }}
                       />
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
+                      <EmptyState
+                        icon={<ShoppingCart />}
+                        title="No Orders Yet"
+                        description="No orders have been placed yet. Orders will appear here once customers start shopping."
+                        size="small"
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -390,7 +583,7 @@ const Dashboard = () => {
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: '#212121' }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
                 Recent Activities
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -403,9 +596,9 @@ const Dashboard = () => {
                       gap: 2,
                       p: 2,
                       borderRadius: '8px',
-                      backgroundColor: '#F8F9FA',
+                      backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
                       '&:hover': {
-                        backgroundColor: '#E3F2FD',
+                        backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD',
                         transform: 'translateX(4px)',
                       },
                       transition: 'all 0.3s ease',
@@ -427,10 +620,10 @@ const Dashboard = () => {
                       {activity.type === 'payment' && <AttachMoney />}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#212121' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                         {activity.message}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#757575' }}>
+                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                         {activity.time}
                       </Typography>
                     </Box>
@@ -439,13 +632,13 @@ const Dashboard = () => {
                       size="small"
                       sx={{
                         backgroundColor: 
-                          activity.status === 'success' ? '#E8F5E8' :
-                          activity.status === 'warning' ? '#FFF3E0' :
-                          activity.status === 'info' ? '#E3F2FD' : '#F5F5F5',
+                          activity.status === 'success' ? `${theme.palette.success.main}20` :
+                          activity.status === 'warning' ? `${theme.palette.warning.main}20` :
+                          activity.status === 'info' ? `${theme.palette.primary.main}20` : `${theme.palette.text.secondary}20`,
                         color: 
-                          activity.status === 'success' ? '#4CAF50' :
-                          activity.status === 'warning' ? '#FF9800' :
-                          activity.status === 'info' ? '#2196F3' : '#757575',
+                          activity.status === 'success' ? theme.palette.success.main :
+                          activity.status === 'warning' ? theme.palette.warning.main :
+                          activity.status === 'info' ? theme.palette.primary.main : theme.palette.text.secondary,
                         textTransform: 'capitalize',
                       }}
                     />
@@ -460,7 +653,7 @@ const Dashboard = () => {
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: '#212121' }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
                 Recent Products
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -473,23 +666,23 @@ const Dashboard = () => {
                       alignItems: 'center',
                       p: 2,
                       borderRadius: '8px',
-                      backgroundColor: '#F8F9FA',
+                      backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
                       '&:hover': {
-                        backgroundColor: '#E3F2FD',
+                        backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD',
                         transform: 'translateX(4px)',
                       },
                       transition: 'all 0.3s ease',
                     }}
                   >
                     <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#212121' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                         {product.name}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#757575' }}>
+                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                         {product.category?.name || 'No Category'} • Stock: {product.stock_quantity || 0}
                       </Typography>
                     </Box>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#4CAF50' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.success.main }}>
                       ₨{product.sale_price || product.price}
                     </Typography>
                   </Box>
@@ -503,32 +696,44 @@ const Dashboard = () => {
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: '#212121' }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
                 Inventory Summary
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Total Quantity</Typography>
-                  <Typography variant="body2" sx={{ color: '#4CAF50', fontWeight: 'bold' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Total Quantity</Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
                     {dashboardData?.inventory?.total_quantity || 0}
                   </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Available</Typography>
-                  <Typography variant="body2" sx={{ color: '#2196F3', fontWeight: 'bold' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Available</Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontWeight: 'bold' }}>
                     {dashboardData?.inventory?.available_quantity || 0}
                   </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Reserved</Typography>
-                  <Typography variant="body2" sx={{ color: '#FF9800', fontWeight: 'bold' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Reserved</Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.warning.main, fontWeight: 'bold' }}>
                     {dashboardData?.inventory?.reserved_quantity || 0}
                   </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Products with Variants</Typography>
-                  <Typography variant="body2" sx={{ color: '#9C27B0', fontWeight: 'bold' }}>
-                    {dashboardData?.products?.products_with_variants || 0}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Low Stock Items</Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.warning.main, fontWeight: 'bold' }}>
+                    {dashboardData?.inventory?.low_stock || 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Out of Stock</Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.error.main, fontWeight: 'bold' }}>
+                    {dashboardData?.inventory?.out_of_stock || 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Total Products</Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.secondary.main, fontWeight: 'bold' }}>
+                    {dashboardData?.products?.total_products || 0}
                   </Typography>
                 </Box>
               </Box>

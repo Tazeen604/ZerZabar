@@ -26,8 +26,11 @@ class ApiService {
       headers['Content-Type'] = 'application/json';
     }
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    // Always check for the latest token from localStorage
+    const currentToken = localStorage.getItem('admin_token');
+    if (currentToken) {
+      this.token = currentToken;
+      headers['Authorization'] = `Bearer ${currentToken}`;
     }
 
     return headers;
@@ -80,6 +83,34 @@ class ApiService {
       console.error('API Error:', error);
       throw error;
     }
+  }
+
+  // Generic HTTP methods
+  async get(endpoint, params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`${endpoint}${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async post(endpoint, data) {
+    const isFormData = data instanceof FormData;
+    return this.request(endpoint, {
+      method: 'POST',
+      body: isFormData ? data : JSON.stringify(data),
+    });
+  }
+
+  async put(endpoint, data) {
+    const isFormData = data instanceof FormData;
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: isFormData ? data : JSON.stringify(data),
+    });
+  }
+
+  async delete(endpoint) {
+    return this.request(endpoint, {
+      method: 'DELETE',
+    });
   }
 
       // Admin Authentication
@@ -298,6 +329,7 @@ class ApiService {
   }
 
   async createOrder(orderData) {
+    console.log('API: Creating order with data:', orderData);
     return this.request('/orders', {
       method: 'POST',
       body: JSON.stringify(orderData),
