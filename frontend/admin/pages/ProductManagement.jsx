@@ -159,10 +159,23 @@ const ProductManagement = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await apiService.getAdminCategories();
+      // Try both paginated and non-paginated endpoints
+      const response = await apiService.getAdminCategories({ paginate: false });
       console.log('Categories response:', response);
-      // Admin categories API returns paginated data, so we need to access the data property
-      const categoriesData = response.data?.data || [];
+      
+      // Handle different response structures
+      let categoriesData = [];
+      if (response.data?.data) {
+        // Paginated response
+        categoriesData = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        // Direct array response
+        categoriesData = response.data;
+      } else if (response.data?.categories) {
+        // Alternative structure
+        categoriesData = response.data.categories;
+      }
+      
       console.log('Categories data:', categoriesData);
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
     } catch (err) {
@@ -177,11 +190,44 @@ const ProductManagement = () => {
         setSubcategories([]);
         return;
       }
+      
+      // First check if category exists
+      const categoryExists = categories.find(cat => cat.id === categoryId);
+      if (!categoryExists) {
+        console.warn('Category not found for subcategory fetch:', categoryId);
+        setSubcategories([]);
+        return;
+      }
+      
       const response = await apiService.get(`/admin/subcategories?category_id=${categoryId}`);
       console.log('Subcategories response:', response);
-      const subcategoriesData = response.data?.data || response.data || [];
+      
+      // Handle different response structures
+      let subcategoriesData = [];
+      if (response.data?.data) {
+        subcategoriesData = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        subcategoriesData = response.data;
+      } else if (response.data?.subcategories) {
+        subcategoriesData = response.data.subcategories;
+      }
+      
       console.log('Subcategories data:', subcategoriesData);
-      setSubcategories(Array.isArray(subcategoriesData) ? subcategoriesData : []);
+      const subcategoriesArray = Array.isArray(subcategoriesData) ? subcategoriesData : [];
+      setSubcategories(subcategoriesArray);
+      
+      // If we have a selected subcategory, check if it belongs to the current category
+      if (productForm.subcategory_id && subcategoriesArray.length > 0) {
+        const subcategoryExists = subcategoriesArray.find(sub => sub.id === productForm.subcategory_id);
+        if (!subcategoryExists) {
+          // Clear the subcategory if it doesn't belong to the current category
+          setProductForm(prev => ({
+            ...prev,
+            subcategory_id: ''
+          }));
+          console.warn('Selected subcategory does not belong to current category, clearing subcategory');
+        }
+      }
     } catch (err) {
       console.error('Error fetching subcategories:', err);
       setSubcategories([]);
@@ -498,6 +544,11 @@ const ProductManagement = () => {
     
     if (!productForm.category_id) {
       errors.category_id = '📂 Please select a category for this product';
+    }
+    
+    // Subcategory validation - only if a subcategory is selected, ensure category is also selected
+    if (productForm.subcategory_id && !productForm.category_id) {
+      errors.subcategory_id = '📂 Please select a category first before selecting a subcategory';
     }
     
     // Image validation - handle existing images for updates
@@ -934,7 +985,11 @@ const ProductManagement = () => {
                   label="Category"
                   onChange={(e) => handleFieldChange('category_id', e.target.value)}
                   required
+                  displayEmpty
                 >
+                  <MenuItem value="" disabled>
+                    {categories.length === 0 ? 'No categories available' : 'Select a category'}
+                  </MenuItem>
                   {(Array.isArray(categories) ? categories : []).map((category) => (
                     <MenuItem key={category.id} value={category.id}>
                       {category.name}
@@ -972,10 +1027,16 @@ const ProductManagement = () => {
                       border: '1px dashed #ccc'
                     }}>
                       <Typography variant="body2" color="text.secondary">
-                        📂 No category selected for this product
+                        {categories.length === 0 
+                          ? '📂 No categories available in the system' 
+                          : '📂 No category selected for this product'
+                        }
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Select a category from the dropdown above
+                        {categories.length === 0 
+                          ? 'Please add categories first in Category Management' 
+                          : 'Select a category from the dropdown above'
+                        }
                       </Typography>
                     </Box>
                   )}
@@ -992,7 +1053,16 @@ const ProductManagement = () => {
                   label="Subcategory"
                   onChange={(e) => handleFieldChange('subcategory_id', e.target.value)}
                   disabled={!productForm.category_id}
+                  displayEmpty
                 >
+                  <MenuItem value="" disabled>
+                    {!productForm.category_id 
+                      ? 'Please select a category first' 
+                      : subcategories.length === 0 
+                        ? 'No subcategories available for this category' 
+                        : 'Select a subcategory (optional)'
+                    }
+                  </MenuItem>
                   {(Array.isArray(subcategories) ? subcategories : []).map((subcategory) => (
                     <MenuItem key={subcategory.id} value={subcategory.id}>
                       {subcategory.name}
@@ -1030,10 +1100,20 @@ const ProductManagement = () => {
                       border: '1px dashed #ccc'
                     }}>
                       <Typography variant="body2" color="text.secondary">
-                        {!productForm.category_id ? '📂 Please select a category first' : '📂 No subcategory selected for this product'}
+                        {!productForm.category_id 
+                          ? '📂 Please select a category first' 
+                          : subcategories.length === 0 
+                            ? '📂 No subcategories available for this category' 
+                            : '📂 No subcategory selected for this product'
+                        }
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {!productForm.category_id ? 'Select a category to see available subcategories' : 'Select a subcategory from the dropdown above'}
+                        {!productForm.category_id 
+                          ? 'Select a category to see available subcategories' 
+                          : subcategories.length === 0 
+                            ? 'This category has no subcategories - subcategory is optional' 
+                            : 'Select a subcategory from the dropdown above (optional)'
+                        }
                       </Typography>
                     </Box>
                   )}

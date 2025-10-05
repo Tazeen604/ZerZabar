@@ -32,6 +32,7 @@ const Shop = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -47,14 +48,24 @@ const Shop = () => {
   // Handle URL parameters on component mount
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
+    const subcategoryFromUrl = searchParams.get('subcategory');
     console.log('URL category parameter:', categoryFromUrl);
+    console.log('URL subcategory parameter:', subcategoryFromUrl);
+    
     if (categoryFromUrl) {
       setSelectedCategory(categoryFromUrl);
       console.log('Set selectedCategory to:', categoryFromUrl);
     } else {
-      // Clear category if no URL parameter - this should show all products
       setSelectedCategory("");
       console.log('No category in URL, clearing selectedCategory to show all products');
+    }
+    
+    if (subcategoryFromUrl) {
+      setSelectedSubcategory(subcategoryFromUrl);
+      console.log('Set selectedSubcategory to:', subcategoryFromUrl);
+    } else {
+      setSelectedSubcategory("");
+      console.log('No subcategory in URL, clearing selectedSubcategory');
     }
   }, [searchParams]);
 
@@ -66,12 +77,12 @@ const Shop = () => {
   // Fetch products when filters change - with delay to ensure state is set
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      console.log('useEffect triggered for fetchProducts with selectedCategory:', selectedCategory);
+      console.log('useEffect triggered for fetchProducts with selectedCategory:', selectedCategory, 'selectedSubcategory:', selectedSubcategory);
       fetchProducts();
     }, 100); // Small delay to ensure state is properly set
     
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, selectedCategory, sortBy, sortOrder, currentPage]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, sortBy, sortOrder, currentPage]);
 
 const fetchProducts = async () => {
   try {
@@ -91,6 +102,11 @@ const fetchProducts = async () => {
     if (selectedCategory && selectedCategory !== "") {
       rawParams.category_id = selectedCategory;
     }
+    
+    // Only include subcategory_id if selectedSubcategory is not empty
+    if (selectedSubcategory && selectedSubcategory !== "") {
+      rawParams.subcategory_id = selectedSubcategory;
+    }
 
     // Filter out empty values
     const params = Object.fromEntries(
@@ -102,12 +118,14 @@ const fetchProducts = async () => {
     console.log('=== SHOP DEBUG ===');
     console.log('Fetching products with params:', params);
     console.log('selectedCategory value:', selectedCategory, 'type:', typeof selectedCategory);
+    console.log('selectedSubcategory value:', selectedSubcategory, 'type:', typeof selectedSubcategory);
     console.log('searchTerm value:', searchTerm);
     console.log('sortBy value:', sortBy);
     console.log('sortOrder value:', sortOrder);
     console.log('rawParams before filtering:', rawParams);
     console.log('params after filtering:', params);
     console.log('Will include category_id?', selectedCategory && selectedCategory !== "");
+    console.log('Will include subcategory_id?', selectedSubcategory && selectedSubcategory !== "");
     const response = await apiService.getProducts(params);
     console.log('API Response:', response);
     console.log('=== END DEBUG ===');
@@ -254,41 +272,184 @@ const fetchCategories = async () => {
             }}
           />
 
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel sx={{ fontSize: '0.85rem' }}>Category</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel 
+                shrink={true}
+                sx={{ 
+                  fontSize: '0.85rem',
+                  color: '#666',
+                  '&.Mui-focused': {
+                    color: '#FFD700',
+                  }
+                }}
+              >Category</InputLabel>
             <Select
               value={selectedCategory}
               onChange={handleCategoryChange}
               label="Category"
                 displayEmpty
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      '& .MuiMenuItem-root.Mui-selected': {
+                        backgroundColor: '#fff8e1',
+                        color: '#FFD700',
+                        '&:hover': {
+                          backgroundColor: '#fff3c4',
+                        },
+                      },
+                    },
+                  },
+                }}
                 sx={{ 
                   fontSize: '0.85rem',
-                  borderRadius: 0,
+                  borderRadius: '8px',
+                  backgroundColor: '#fafafa',
+                  '&:hover': {
+                    backgroundColor: '#f5f5f5',
+                  },
+                  '&.Mui-focused': {
+                    backgroundColor: '#fff',
+                    boxShadow: '0 0 0 2px rgba(255, 215, 0, 0.2)',
+                  },
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#e0e0e0',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#FFD700',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#FFD700',
+                  },
                 }}
             >
-                <MenuItem value="" sx={{ fontSize: '0.85rem' }}>All Products</MenuItem>
+                <MenuItem value="" sx={{ 
+                  fontSize: '0.85rem',
+                  '&:hover': {
+                    backgroundColor: '#fff8e1',
+                    color: '#FFD700',
+                  },
+                  '&.Mui-selected': {
+                    backgroundColor: '#fff8e1',
+                    color: '#FFD700',
+                    '&:hover': {
+                      backgroundColor: '#fff3c4',
+                    },
+                  },
+                }}>All Products</MenuItem>
               {categories.map((category) => (
-                  <MenuItem key={category.id} value={category.id} sx={{ fontSize: '0.85rem' }}>
+                  <MenuItem key={category.id} value={category.id} sx={{ 
+                    fontSize: '0.85rem',
+                    '&:hover': {
+                      backgroundColor: '#fff8e1',
+                      color: '#FFD700',
+                    },
+                    '&.Mui-selected': {
+                      backgroundColor: '#fff8e1',
+                      color: '#FFD700',
+                      '&:hover': {
+                        backgroundColor: '#fff3c4',
+                      },
+                    },
+                  }}>
                   {category.name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: 100 }}>
-              <InputLabel sx={{ fontSize: '0.85rem' }}>Sort</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel 
+                shrink={true}
+                sx={{ 
+                  fontSize: '0.85rem',
+                  color: '#666',
+                  '&.Mui-focused': {
+                    color: '#FFD700',
+                  }
+                }}
+              >Sort</InputLabel>
             <Select
               value={sortBy}
               onChange={handleSortChange}
                 label="Sort"
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      '& .MuiMenuItem-root.Mui-selected': {
+                        backgroundColor: '#fff8e1',
+                        color: '#FFD700',
+                        '&:hover': {
+                          backgroundColor: '#fff3c4',
+                        },
+                      },
+                    },
+                  },
+                }}
                 sx={{ 
                   fontSize: '0.85rem',
-                  borderRadius: 0,
+                  borderRadius: '8px',
+                  backgroundColor: '#fafafa',
+                  '&:hover': {
+                    backgroundColor: '#f5f5f5',
+                  },
+                  '&.Mui-focused': {
+                    backgroundColor: '#fff',
+                    boxShadow: '0 0 0 2px rgba(255, 215, 0, 0.2)',
+                  },
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#e0e0e0',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#FFD700',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#FFD700',
+                  },
                 }}
               >
-                <MenuItem value="created_at" sx={{ fontSize: '0.85rem' }}>Newest</MenuItem>
-                <MenuItem value="name" sx={{ fontSize: '0.85rem' }}>Name</MenuItem>
-                <MenuItem value="price" sx={{ fontSize: '0.85rem' }}>Price</MenuItem>
+                <MenuItem value="created_at" sx={{ 
+                  fontSize: '0.85rem',
+                  '&:hover': {
+                    backgroundColor: '#fff8e1',
+                    color: '#FFD700',
+                  },
+                  '&.Mui-selected': {
+                    backgroundColor: '#fff8e1',
+                    color: '#FFD700',
+                    '&:hover': {
+                      backgroundColor: '#fff3c4',
+                    },
+                  },
+                }}>Newest</MenuItem>
+                <MenuItem value="name" sx={{ 
+                  fontSize: '0.85rem',
+                  '&:hover': {
+                    backgroundColor: '#fff8e1',
+                    color: '#FFD700',
+                  },
+                  '&.Mui-selected': {
+                    backgroundColor: '#fff8e1',
+                    color: '#FFD700',
+                    '&:hover': {
+                      backgroundColor: '#fff3c4',
+                    },
+                  },
+                }}>Name</MenuItem>
+                <MenuItem value="price" sx={{ 
+                  fontSize: '0.85rem',
+                  '&:hover': {
+                    backgroundColor: '#fff8e1',
+                    color: '#FFD700',
+                  },
+                  '&.Mui-selected': {
+                    backgroundColor: '#fff8e1',
+                    color: '#FFD700',
+                    '&:hover': {
+                      backgroundColor: '#fff3c4',
+                    },
+                  },
+                }}>Price</MenuItem>
             </Select>
           </FormControl>
           </Box>

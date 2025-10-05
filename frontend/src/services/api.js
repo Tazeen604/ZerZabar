@@ -1,5 +1,5 @@
 const API_BASE_URL = 'http://localhost:8000/api';
-
+//const API_BASE_URL = 'http://localhost:8000/api';
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
@@ -240,9 +240,6 @@ class ApiService {
     return this.request(`/admin/inventory${queryString ? `?${queryString}` : ''}`);
   }
 
-  async getLowStockReport() {
-    return this.request('/admin/inventory/low-stock');
-  }
 
   async adjustStock(productId, stockData) {
     return this.request(`/admin/inventory/${productId}/adjust`, {
@@ -305,8 +302,10 @@ class ApiService {
     return this.request('/products/featured');
   }
 
-  async getNewArrivals() {
-    return this.request('/products/new-arrivals');
+  async getNewArrivals(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `/products/new-arrivals?${queryString}` : '/products/new-arrivals';
+    return this.request(url);
   }
 
   async getCarouselProducts() {

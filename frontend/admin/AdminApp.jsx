@@ -5,11 +5,14 @@ import { CssBaseline, Box } from '@mui/material';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ErrorProvider } from './contexts/ErrorContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { SettingsProvider } from './contexts/SettingsContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Inventory from './pages/Inventory';
+import LowStock from './pages/LowStock';
 import Orders from './pages/Orders';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -20,6 +23,7 @@ import CategoryManagement from './pages/CategoryManagement';
 import AddProduct from './pages/AddProduct';
 import AddCategory from './pages/AddCategory';
 import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 
 const AdminAppContent = () => {
   const { theme } = useTheme();
@@ -125,8 +129,10 @@ const AdminAppContent = () => {
               <Route path="/product-management" element={<ProductManagement />} />
               <Route path="/category-management" element={<CategoryManagement />} />
               <Route path="/inventory" element={<Inventory />} />
+              <Route path="/inventory/low-stock" element={<LowStock />} />
               <Route path="/orders" element={<Orders />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Dashboard />} />
             </Routes>
           </Box>
@@ -141,7 +147,11 @@ const AdminAppContent = () => {
 const AdminApp = () => {
   return (
     <ThemeProvider>
-      <AdminAppContent />
+        <SettingsProvider>
+          <NotificationProvider>
+            <AdminAppContent />
+          </NotificationProvider>
+        </SettingsProvider>
     </ThemeProvider>
   );
 };

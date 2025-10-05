@@ -25,11 +25,14 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const TopBar = ({ sidebarOpen }) => {
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
   const { isDarkMode, toggleTheme, theme } = useTheme();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, getRecentNotifications } = useNotifications();
 
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -44,6 +47,24 @@ const TopBar = ({ sidebarOpen }) => {
     localStorage.removeItem('admin_user');
     setAnchorEl(null);
     window.location.href = '/admin/login';
+  };
+
+  const handleNotificationMenuOpen = (event) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+
+  const handleNotificationMenuClose = () => {
+    setNotificationAnchorEl(null);
+  };
+
+  const handleNotificationClick = (notification) => {
+    markAsRead(notification.id);
+    handleNotificationMenuClose();
+  };
+
+  const handleMarkAllAsRead = () => {
+    markAllAsRead();
+    handleNotificationMenuClose();
   };
 
   return (
@@ -88,6 +109,7 @@ const TopBar = ({ sidebarOpen }) => {
 
           {/* Notifications */}
           <IconButton
+            onClick={handleNotificationMenuOpen}
             sx={{
               color: theme.palette.text.secondary,
               '&:hover': {
@@ -97,13 +119,14 @@ const TopBar = ({ sidebarOpen }) => {
               transition: 'all 0.3s ease',
             }}
           >
-            <Badge badgeContent={3} color="error">
+            <Badge badgeContent={unreadCount} color="error">
               <Notifications />
             </Badge>
           </IconButton>
 
           {/* Settings */}
           <IconButton
+            onClick={() => navigate('/admin/settings')}
             sx={{
               color: theme.palette.text.secondary,
               '&:hover': {
@@ -237,6 +260,86 @@ const TopBar = ({ sidebarOpen }) => {
               </ListItemIcon>
               <ListItemText>Logout</ListItemText>
             </MenuItem>
+          </Menu>
+
+          {/* Notification Dropdown Menu */}
+          <Menu
+            anchorEl={notificationAnchorEl}
+            open={Boolean(notificationAnchorEl)}
+            onClose={handleNotificationMenuClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+            sx={{
+              '& .MuiPaper-root': {
+                borderRadius: '12px',
+                boxShadow: theme.palette.mode === 'dark' 
+                  ? '0 4px 20px rgba(0,0,0,0.3)' 
+                  : '0 4px 20px rgba(0,0,0,0.15)',
+                mt: 1,
+                backgroundColor: theme.palette.background.paper,
+                minWidth: 300,
+                maxHeight: 400,
+              },
+            }}
+          >
+            <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                  Notifications
+                </Typography>
+                {unreadCount > 0 && (
+                  <Button
+                    size="small"
+                    onClick={handleMarkAllAsRead}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Mark all as read
+                  </Button>
+                )}
+              </Box>
+            </Box>
+            
+            <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+              {getRecentNotifications(10).length > 0 ? (
+                getRecentNotifications(10).map((notification) => (
+                  <MenuItem
+                    key={notification.id}
+                    onClick={() => handleNotificationClick(notification)}
+                    sx={{
+                      borderBottom: `1px solid ${theme.palette.divider}`,
+                      backgroundColor: notification.read ? 'transparent' : `${theme.palette.primary.main}10`,
+                      '&:hover': {
+                        backgroundColor: `${theme.palette.primary.main}20`,
+                      },
+                    }}
+                  >
+                    <Box sx={{ width: '100%' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: notification.read ? 'normal' : 'bold' }}>
+                        {notification.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {notification.message}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        {new Date(notification.created_at).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))
+              ) : (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No notifications
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           </Menu>
         </Box>
       </Toolbar>

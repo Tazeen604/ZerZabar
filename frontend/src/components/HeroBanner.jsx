@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Button, Typography } from "@mui/material";
 import menswearVideo from "../assets/hero_banner.mp4";
+import Logo from "./Logo";
 
 const HeroBanner = () => {
   return (
@@ -32,6 +33,9 @@ const HeroBanner = () => {
         }}
       />
 
+      {/* Logo Section - Above Content */}
+      <Logo size="large" position="absolute" />
+
       {/* Content Wrapper - Positioned below navbar */}
       <Box
         sx={{
@@ -44,15 +48,16 @@ const HeroBanner = () => {
           alignItems: "flex-start",
           textAlign: "center",
           px: { xs: 2, sm: 4, md: 6 },
-          pt: { xs: 20, md: 24 }, // Top padding to position below navbar
+          pt: { xs: 20, md: 24 }, // Top padding to position below logo and navbar (reduced)
         }}
       >
+
         {/* Overlay Box */}
         <Box
           sx={{
             background: {
               xs: "rgba(0,0,0,0.4)", // lighter on mobile
-              md: "rgba(0,0,0,0.6)", // darker on desktop
+              md: "rgba(0,0,0,0.5)", // darker on desktop
             },
             borderRadius: "20px",
             px: { xs: 2, sm: 4, md: 6 },

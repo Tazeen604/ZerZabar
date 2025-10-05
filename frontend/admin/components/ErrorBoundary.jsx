@@ -68,7 +68,7 @@ class ErrorBoundary extends React.Component {
                     Error Details:
                   </Typography>
                   <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                    {this.state.error.toString()}
+                    {this.state.error?.toString() || 'Unknown error'}
                   </Typography>
                   {this.state.errorInfo && (
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', mt: 1 }}>
@@ -111,5 +111,6 @@ class ErrorBoundary extends React.Component {
 }
 
 export default ErrorBoundary;
+
 
 

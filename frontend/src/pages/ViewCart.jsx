@@ -7,13 +7,13 @@ import {
   Grid,
   Card,
   CardContent,
-  CardMedia,
   Divider,
   TextField,
   Chip,
   Paper,
   Stack,
   Avatar,
+  InputAdornment,
 } from "@mui/material";
 import {
   Delete,
@@ -25,6 +25,8 @@ import {
   LocalShipping,
   Security,
   Support,
+  Lock,
+  Help,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
@@ -61,7 +63,7 @@ const ViewCart = () => {
 
   if (items.length === 0) {
     return (
-      <Box sx={{ minHeight: "100vh", background: "#f8f9fa" }}>
+      <Box sx={{ minHeight: "100vh", background: "#ffffff" }}>
         {/* Empty Cart */}
         <Box
           sx={{
@@ -76,32 +78,36 @@ const ViewCart = () => {
         >
           <Avatar
             sx={{
-              width: 120,
-              height: 120,
+              width: 80,
+              height: 80,
               backgroundColor: "#f0f0f0",
-              mb: 3,
+              mb: 2,
             }}
           >
-            <ShoppingBag sx={{ fontSize: 60, color: "#999" }} />
+            <ShoppingBag sx={{ fontSize: 40, color: "#999" }} />
           </Avatar>
           
-          <Typography variant="h4" sx={{ fontWeight: "bold", mb: 2, color: "#333" }}>
+          <Typography variant="h5" sx={{ fontWeight: "bold", mb: 1, color: "#000", fontSize: "1.625rem" }}>
             Your Cart is Empty
           </Typography>
           
-          <Typography variant="body1" sx={{ color: "#666", mb: 4, maxWidth: 400 }}>
+          <Typography variant="body2" sx={{ color: "#666", mb: 3, maxWidth: 400, fontSize: "0.9375rem" }}>
             Looks like you haven't added any items to your cart yet. Start shopping to fill it up!
           </Typography>
           
           <Button
             variant="contained"
-            size="large"
+            size="small"
             onClick={handleContinueShopping}
             sx={{
               background: "#FFD700",
+              color: "#000",
               "&:hover": { background: "#E6C200" },
-              px: 4,
-              py: 1.5,
+              px: 3,
+              py: 1,
+              fontSize: "0.9375rem",
+              fontWeight: "bold",
+              textTransform: "none",
             }}
           >
             Continue Shopping
@@ -112,77 +118,43 @@ const ViewCart = () => {
   }
 
   return (
-    <PageContainer maxWidth="lg" sx={{ background: "#f8f9fa", minHeight: "100vh" }}>
-      <Grid container spacing={4}>
-          {/* Left Half - Product Images Gallery */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', overflow: 'hidden' }}>
-              <CardContent sx={{ p: 0 }}>
-                {/* Main Image Display */}
-                <Box
+    <Box sx={{ minHeight: "100vh", background: "#ffffff", py: 4 }}>
+      <Box sx={{ maxWidth: "1800px", mx: "auto", px: 3 }}>
+        {/* Header */}
+        <Box sx={{ display: "flex", alignItems: "center", mb: 4,mt:8, justifyContent: "center" }}>
+          <ShoppingCart sx={{ fontSize: "1.5rem", mr: 1, color: "#000" }} />
+          <Typography variant="h4" sx={{ fontWeight: "bold", color: "#000", fontSize: "1.875rem" }}>
+            My Cart
+          </Typography>
+        </Box>
+
+        <Grid container spacing={6} justifyContent="center">
+          {/* Left Side - Cart Items */}
+          <Grid item xs={12} lg={7} sx={{ pr: { lg: 2 } }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {items.map((item) => (
+                <Paper
+                  key={item.cartId}
                   sx={{
-                    position: 'relative',
-                    width: '100%',
-                    height: '400px',
-                    overflow: 'hidden',
-                    backgroundColor: '#f5f5f5',
+                    p: 3,
+                    backgroundColor: "white",
+                    minHeight: "200px",
+                    width: "100%",
+                    borderBottom: "1px solid #eee",
+                    pb: 2,
+                    mb: 2,
                   }}
                 >
-                  {items[selectedImageIndex]?.image ? (
-                    <img
-                      src={`http://localhost:8000/storage/${items[selectedImageIndex].image}`}
-                      alt={items[selectedImageIndex].name}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                  ) : (
+                  <Box sx={{ display: "flex", gap: 2 }}>
+                    {/* Product Image */}
                     <Box
                       sx={{
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#f5f5f5',
-                        color: '#999',
-                      }}
-                    >
-                      <Typography variant="h6">No Image Available</Typography>
-                    </Box>
-                  )}
-                </Box>
-
-                {/* Thumbnail Gallery */}
-                <Box sx={{ p: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold' }}>
-                    Product Images:
-                  </Typography>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      gap: 2,
-                      overflowX: 'auto',
-                      pb: 1,
-                    }}
-                  >
-                    {items.map((item, index) => (
-                      <Box
-                        key={item.cartId}
-                        onClick={() => setSelectedImageIndex(index)}
-                        sx={{
-                          minWidth: '80px',
-                          height: '80px',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          cursor: 'pointer',
-                          border: selectedImageIndex === index ? '3px solid #FFD700' : '3px solid transparent',
-                          transition: 'all 0.3s ease',
-                          '&:hover': {
-                            transform: 'scale(1.05)',
-                          },
+                        width: 140,
+                        height: 180,
+                        overflow: "hidden",
+                        borderRadius: "8px",
+                        backgroundColor: "#f5f5f5",
+                        flexShrink: 0,
                         }}
                       >
                         {item.image ? (
@@ -190,103 +162,21 @@ const ViewCart = () => {
                             src={`http://localhost:8000/storage/${item.image}`}
                             alt={item.name}
                             style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
                             }}
                           />
                         ) : (
                           <Box
                             sx={{
-                              width: '100%',
-                              height: '100%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: '#f0f0f0',
-                              color: '#999',
-                            }}
-                          >
-                            <ShoppingBag />
-                          </Box>
-                        )}
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Right Half - Cart Details */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ 
-              height: '100%',
-              position: { md: 'sticky' },
-              top: { md: 100 }, // Below navbar
-              maxHeight: { md: 'calc(100vh - 120px)' },
-              overflow: { md: 'auto' }
-            }}>
-              <CardContent sx={{ p: 3 }}>
-                {/* Cart Header */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                    Shopping Cart ({getTotalItems()} items)
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={clearCart}
-                    sx={{ textTransform: 'none' }}
-                  >
-                    Clear Cart
-                  </Button>
-                </Box>
-
-                {/* Cart Items */}
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 4 }}>
-                  {items.map((item) => (
-                    <Paper
-                      key={item.cartId}
-                      sx={{
-                        p: 2,
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '12px',
-                        backgroundColor: 'white',
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        {/* Product Image */}
-                        <Box
-                          sx={{
-                            width: 120,
-                            height: 120,
-                            borderRadius: '8px',
-                            overflow: 'hidden',
-                            backgroundColor: '#f5f5f5',
-                            flexShrink: 0,
-                          }}
-                        >
-                          {item.image ? (
-                            <img
-                              src={`http://localhost:8000/storage/${item.image}`}
-                              alt={item.name}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                              }}
-                            />
-                          ) : (
-                            <Box
-                              sx={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: '#f0f0f0',
-                                color: '#999',
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#f0f0f0",
+                            color: "#999",
                               }}
                             >
                               <ShoppingBag />
@@ -295,159 +185,261 @@ const ViewCart = () => {
                         </Box>
 
                         {/* Product Details */}
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                    <Box sx={{ flexGrow: 1,ml:6 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: "bold", mb: 1, fontSize: "0.9375rem" }}>
                             {item.name}
                           </Typography>
                           
-                          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                      <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
                             {item.size && (
-                              <Chip label={`Size: ${item.size}`} size="small" variant="outlined" />
+                          <Typography variant="caption" sx={{ color: "#666", fontSize: "0.8125rem" }}>
+                            Size: {item.size}
+                          </Typography>
                             )}
                             {item.color && (
-                              <Chip label={`Color: ${item.color}`} size="small" variant="outlined" />
-                            )}
+                          <Typography variant="caption" sx={{ color: "#666", fontSize: "0.8125rem" }}>
+                            Color: {item.color}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" sx={{ color: "#4CAF50", fontSize: "0.8125rem" }}>
+                          In Stock
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2 }}>
+                        {/* Price */}
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
+                            ₨{(parseFloat(item.price || 0) * item.quantity).toFixed(2)}
+                          </Typography>
                           </Box>
 
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             {/* Quantity Controls */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                               <IconButton
                                 onClick={() => handleQuantityChange(item.cartId, item.quantity - 1)}
                                 size="small"
-                                sx={{ border: '1px solid #ddd' }}
-                              >
-                                <Remove />
+                            sx={{ 
+                              border: "1px solid #ddd", 
+                              width: "24px", 
+                              height: "24px",
+                              fontSize: "0.75rem"
+                            }}
+                          >
+                            <Remove sx={{ fontSize: "0.875rem" }} />
                               </IconButton>
                               <TextField
                                 value={item.quantity}
                                 onChange={(e) => handleQuantityChange(item.cartId, parseInt(e.target.value) || 1)}
-                                sx={{ width: '60px' }}
-                                inputProps={{ style: { textAlign: 'center' } }}
+                            sx={{ 
+                              width: "40px",
+                              "& .MuiInputBase-input": {
+                                textAlign: "center",
+                                fontSize: "0.75rem",
+                                padding: "4px"
+                              }
+                            }}
+                            size="small"
                               />
                               <IconButton
                                 onClick={() => handleQuantityChange(item.cartId, item.quantity + 1)}
                                 size="small"
-                                sx={{ border: '1px solid #ddd' }}
-                              >
-                                <Add />
+                            sx={{ 
+                              border: "1px solid #ddd", 
+                              width: "24px", 
+                              height: "24px",
+                              fontSize: "0.75rem"
+                            }}
+                          >
+                            <Add sx={{ fontSize: "0.875rem" }} />
                               </IconButton>
                             </Box>
 
-                            {/* Price and Remove */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
-                                ₨{(parseFloat(item.price || 0) * item.quantity).toFixed(2)}
-                              </Typography>
+                        {/* Remove Button */}
                               <IconButton
                                 onClick={() => removeFromCart(item.cartId)}
-                                color="error"
                                 size="small"
+                          sx={{ color: "#666" }}
                               >
-                                <Delete />
+                          <Delete sx={{ fontSize: "1rem" }} />
                               </IconButton>
                             </Box>
+
+                      {/* Action Links */}
+                      <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ color: "#666", cursor: "pointer", fontSize: "0.8125rem" }}
+                          onClick={() => {
+                            // Edit functionality - could open a modal or navigate to product page
+                            console.log('Edit item:', item);
+                            // For now, just log - you can implement edit modal later
+                          }}
+                        >
+                          Edit
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ color: "#666", cursor: "pointer", fontSize: "0.8125rem" }}
+                          onClick={() => removeFromCart(item.cartId)}
+                        >
+                          Remove
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ color: "#666", cursor: "pointer", fontSize: "0.8125rem" }}
+                          onClick={() => {
+                            // Add to wishlist functionality
+                            console.log('Add to wishlist:', item);
+                            // You can implement wishlist functionality here
+                          }}
+                        >
+                          Add to Wishlist
+                        </Typography>
                           </Box>
                         </Box>
                       </Box>
                     </Paper>
                   ))}
-                </Box>
 
-                <Divider sx={{ my: 3 }} />
+              {/* Cart Subtotal */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
+                  {getTotalItems()} Items
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
+                 Total ₨{getTotalPrice().toFixed(2)}
+                </Typography>
+              </Box>
+            </Box>
+          </Grid>
 
-                {/* Order Summary */}
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>
-                    Order Summary
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Subtotal ({getTotalItems()} items)</Typography>
-                    <Typography variant="body1">₨{getTotalPrice().toFixed(2)}</Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Shipping</Typography>
-                    <Typography variant="body1" color="success.main">
-                      Free
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Tax</Typography>
-                    <Typography variant="body1">₨{(getTotalPrice() * 0.1).toFixed(2)}</Typography>
-                  </Box>
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                      Total
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
-                      ₨{(getTotalPrice() + getTotalPrice() * 0.1).toFixed(2)}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {/* Action Buttons */}
-                <Stack spacing={2} sx={{ mb: 3 }}>
+          {/* Right Side - Order Summary */}
+          <Grid item xs={12} lg={3} sx={{ pl: { lg: 2 } }}>
+            <Paper sx={{ p: 3, backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+              {/* Promo Code */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1, fontSize: "0.8125rem", textTransform: "uppercase" }}>
+                  Enter PROMO CODE
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <TextField
+                    placeholder="Promo Code"
+                    size="small"
+                    sx={{
+                      flex: 1,
+                      "& .MuiInputBase-input": {
+                        fontSize: "0.8125rem",
+                        padding: "8px"
+                      }
+                    }}
+                  />
                   <Button
                     variant="contained"
-                    size="large"
-                    onClick={handleCheckout}
+                    size="small"
                     sx={{
-                      background: '#FFD700',
-                      '&:hover': { background: '#E6C200' },
-                      py: 1.5,
-                      fontSize: '1.1rem',
-                      fontWeight: 'bold',
+                      backgroundColor: "#000",
+                      color: "#fff",
+                      fontSize: "0.8125rem",
+                      px: 2,
+                      textTransform: "none"
                     }}
                   >
-                    Proceed to Checkout
+                    Submit
+                  </Button>
+                </Box>
+                </Box>
+
+              {/* Cost Breakdown */}
+                <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                  <Typography variant="body2" sx={{ color: "#666", fontSize: "0.8125rem" }}>
+                    Shipping
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#666", fontSize: "0.8125rem" }}>
+                    ₨200
+                  </Typography>
+                  </Box>
+                  
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                  <Typography variant="body2" sx={{ color: "#666", fontSize: "0.8125rem" }}>
+                    Discount
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#666", fontSize: "0.8125rem" }}>
+                    -₨0
+                    </Typography>
+                  </Box>
+                  
+                
+                <Divider sx={{ my: 1 }} />
+                
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
+                    Estimated Total
+                    </Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
+                    ₨{(getTotalPrice() + 200).toFixed(2)}
+                    </Typography>
+                  </Box>
+                </Box>
+
+              {/* Payment Option */}
+              <Box sx={{ mb: 3 }}>
+               
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                
+                 
+                </Box>
+              </Box>
+
+             
+
+              {/* Checkout Button */}
+                  <Button
+                    variant="contained"
+                fullWidth
+                    onClick={handleCheckout}
+                    sx={{
+                  backgroundColor: "#FFD700",
+                  color: "#000",
+                  fontWeight: "bold",
+                      py: 1.5,
+                  fontSize: "0.9375rem",
+                  textTransform: "none",
+                  mb: 2,
+                  "&:hover": {
+                    backgroundColor: "#E6C200",
+                  }
+                }}
+                startIcon={<Lock sx={{ fontSize: "1rem" }} />}
+              >
+                Checkout
                   </Button>
                   
+              {/* Continue Shopping Button */}
                   <Button
                     variant="outlined"
-                    size="large"
+                fullWidth
                     onClick={handleContinueShopping}
                     sx={{
-                      borderColor: '#FFD700',
-                      color: '#FFD700',
-                      '&:hover': {
-                        borderColor: '#E6C200',
-                        background: 'rgba(255,215,0,0.1)',
-                      },
-                      py: 1.5,
-                      fontSize: '1.1rem',
-                      fontWeight: 'bold',
+                  borderColor: "#ddd",
+                  color: "#000",
+                  py: 1,
+                  fontSize: "0.8125rem",
+                  textTransform: "none",
+                  "&:hover": {
+                    borderColor: "#000",
+                    backgroundColor: "rgba(0,0,0,0.05)",
+                  }
                     }}
                   >
                     Continue Shopping
                   </Button>
-                </Stack>
-
-                {/* Trust Badges */}
-                <Box sx={{ display: 'flex', gap: 3, mt: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <LocalShipping sx={{ color: '#4CAF50' }} />
-                    <Typography variant="body2">Free Shipping</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Security sx={{ color: '#4CAF50' }} />
-                    <Typography variant="body2">Secure Payment</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Support sx={{ color: '#4CAF50' }} />
-                    <Typography variant="body2">24/7 Support</Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
+            </Paper>
           </Grid>
         </Grid>
-    </PageContainer>
+      </Box>
+    </Box>
   );
 };
 

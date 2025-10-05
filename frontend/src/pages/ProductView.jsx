@@ -38,6 +38,7 @@ const ProductView = () => {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0); // Current image index
+  const [showImageIndex, setShowImageIndex] = useState(true); // Whether to show image index
   const stickyTop = 80;
 
   const containerRef = useRef(null); // slider container
@@ -46,8 +47,13 @@ const ProductView = () => {
 
   // Set total height for image sliding
   useEffect(() => {
-    if (product?.images) {
-      setTotalHeight(product.images.length * window.innerHeight);
+    if (product?.images?.length) {
+      // Container must be tall enough for all images
+      const totalHeightValue = (product.images.length-1) * window.innerHeight;
+      setTotalHeight(totalHeightValue);
+      setCurrentIndex(0); // Reset to first image when product changes
+      
+      console.log('SETUP: images:', product.images.length, '| totalHeight:', totalHeightValue, '| sliderEnd:', (product.images.length - 1) * window.innerHeight);
     }
   }, [product?.images]);
 
@@ -60,25 +66,48 @@ const ProductView = () => {
       const containerTop = containerRef.current.offsetTop;
       const scrollInContainer = Math.max(0, scrollY - containerTop);
 
-      // Slide images
-      const imageTranslation = Math.min(scrollInContainer, (product.images.length - 1) * window.innerHeight);
+      // Calculate threshold for responsive index changes
+      const threshold = window.innerHeight * 0.3; // Change index when 30% through image
+      
+      // Slide images - stop when last image is fully visible
+      const maxImageTranslation = (product.images.length - 1) * window.innerHeight;
+      const imageTranslation = Math.min(scrollInContainer, maxImageTranslation);
       innerRef.current.style.transform = `translateY(-${imageTranslation}px)`;
 
-      // Right section sticky / absolute
+      // Right section sticky / absolute - stop moving when slider ends
+      const lastImageThreshold = (product.images.length - 1) * threshold; // When last image index starts
+      const sliderEndThreshold = (product.images.length - 1) * window.innerHeight; // When last image is fully visible
       const maxTranslation = containerRef.current.offsetHeight - rightRef.current.offsetHeight;
-      if (scrollInContainer < maxTranslation) {
+      
+      if (scrollInContainer < sliderEndThreshold) {
+        // Keep fixed while scrolling through all images
         rightRef.current.style.position = "fixed";
         rightRef.current.style.top = `${stickyTop + 90}px`;
       } else {
+        // When last image is fully visible, stop moving and let normal scroll take over
         rightRef.current.style.position = "absolute";
         rightRef.current.style.top = `${maxTranslation}px`;
       }
 
-      // Update current image index
-      const index = Math.min(
-        product.images.length - 1,
-        Math.floor(scrollInContainer / window.innerHeight)
-      );
+      // Update current image index - stop changing when slider ends
+      const imageIndex = Math.floor(scrollInContainer / threshold);
+      const index = Math.min(product.images.length - 1, Math.max(0, imageIndex));
+      
+      // Stop showing image index when slider ends
+      const shouldShowIndex = scrollInContainer < sliderEndThreshold;
+      setShowImageIndex(shouldShowIndex);
+      
+      // Calculate additional debug values
+      const containerTopDoc = scrollY + containerRef.current.getBoundingClientRect().top;
+      const start = containerTopDoc - stickyTop;
+      const progress = Math.max(0, scrollY - start);
+      const translate = Math.min(progress, imageTranslation);
+      const visibleFrame = window.innerHeight;
+      const rawIndex = Math.floor(translate / visibleFrame);
+      
+      // KEY DEBUG VALUES
+      console.log('scrollTop:', scrollY, '| windowHeight:', window.innerHeight, '| totalHeightValue:', totalHeight, '| maxImageTranslation:', maxImageTranslation, '| sliderEndThreshold:', sliderEndThreshold, '| calculatedIndex:', index);
+      
       setCurrentIndex(index);
     };
 
@@ -150,6 +179,10 @@ const ProductView = () => {
     setCartDrawerOpen(true);
   };
 
+  const handleCheckout = () => {
+    navigate("/checkout");
+  };
+
   if (loading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
@@ -161,7 +194,20 @@ const ProductView = () => {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "100vh", p: 4 }}>
         <Typography variant="h6" color="error" sx={{ mb: 2 }}>{error}</Typography>
-        <Button startIcon={<ArrowBackIosIcon />} onClick={() => navigate("/shop")}>Back to Shop</Button>
+        <Button 
+          startIcon={<ArrowBackIosIcon />} 
+          onClick={() => navigate("/shop")}
+          sx={{
+            color: '#000',
+            fontWeight: 500,
+            textTransform: 'none',
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            }
+          }}
+        >
+          Back to Shop
+        </Button>
       </Box>
     );
 
@@ -169,14 +215,27 @@ const ProductView = () => {
     <Box sx={{ backgroundColor: "#fff", pt: "100px" }}>
       {/* Back button */}
       <Box sx={{ px: 3, maxWidth: "1200px", mx: "auto", mb: 4 }}>
-        <Button startIcon={<ArrowBackIosIcon />} onClick={() => navigate("/shop")}>Back to Shop</Button>
+        <Button 
+          startIcon={<ArrowBackIosIcon />} 
+          onClick={() => navigate("/shop")}
+          sx={{
+            color: '#000',
+            fontWeight: 500,
+            textTransform: 'none',
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            }
+          }}
+        >
+          Back to Shop
+        </Button>
       </Box>
 
       <Box sx={{ position: "relative", maxWidth: 1200, mx: "auto" }}>
         {/* Image Slider */}
         <Box sx={{ pr: { md: "420px" }, p: 2 }}>
           <Box sx={{ maxWidth: 640 }}>
-            <Box ref={containerRef} sx={{ position: "relative", height: `${totalHeight}px` }}>
+            <Box ref={containerRef} sx={{ position: "relative", height: `${totalHeight}px`, overflow: "hidden" }}>
               <Box ref={innerRef} sx={{ position: "absolute", top: 0, left: 0, width: "100%", transition: "transform 0.12s linear", willChange: "transform" }}>
                 {product.images?.length ? product.images.map((image, idx) => (
                   <Box key={idx} sx={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -232,21 +291,23 @@ const ProductView = () => {
           </Paper>
         </Box>
 
-        {/* Image Index */}
-        <Box sx={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          bgcolor: "rgba(0,0,0,0.5)",
-          color: "#fff",
-          px: 2,
-          py: 1,
-          borderRadius: 1,
-          zIndex: 20,
-        }}>
-          {currentIndex + 1} / {product.images?.length}
-        </Box>
+        {/* Image Index - only show when slider is active */}
+        {showImageIndex && (
+          <Box sx={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            bgcolor: "rgba(0,0,0,0.5)",
+            color: "#fff",
+            px: 2,
+            py: 1,
+            borderRadius: 1,
+            zIndex: 20,
+          }}>
+            {currentIndex + 1} / {product.images?.length}
+          </Box>
+        )}
 
                 </Box>
 
@@ -467,6 +528,7 @@ const ProductView = () => {
                   <Button
                     variant="contained"
            fullWidth 
+           onClick={handleCheckout}
                     sx={{
              mb: { xs: 1.5, md: 2 }, 
              py: { xs: 1.8, md: 1.5 }, 
@@ -496,6 +558,98 @@ const ProductView = () => {
            Continue Shopping
                   </Button>
        </Drawer>
+
+       {/* Related Products Section */}
+       <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3, mt: 4 }}>
+         <Typography variant="h4" sx={{ fontWeight: 600, mb: 3, textAlign: 'center' }}>
+           Related Products
+         </Typography>
+         
+         <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 2 }}>
+           {/* Related Product 1 */}
+           <Box sx={{ minWidth: 280, flex: '0 0 280px' }}>
+             <Box sx={{ 
+               height: 200, 
+               backgroundColor: '#f5f5f5', 
+               borderRadius: 2, 
+               mb: 2,
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center'
+             }}>
+               <Typography color="text.secondary">Related Product 1</Typography>
+             </Box>
+             <Typography variant="h6" sx={{ fontWeight: 500, mb: 1 }}>Related Product 1</Typography>
+             <Typography variant="body1" sx={{ color: 'text.secondary', mb: 1 }}>₨2,500</Typography>
+           </Box>
+           
+           {/* Related Product 2 */}
+           <Box sx={{ minWidth: 280, flex: '0 0 280px' }}>
+             <Box sx={{ 
+               height: 200, 
+               backgroundColor: '#f5f5f5', 
+               borderRadius: 2, 
+               mb: 2,
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center'
+             }}>
+               <Typography color="text.secondary">Related Product 2</Typography>
+             </Box>
+             <Typography variant="h6" sx={{ fontWeight: 500, mb: 1 }}>Related Product 2</Typography>
+             <Typography variant="body1" sx={{ color: 'text.secondary', mb: 1 }}>₨3,200</Typography>
+           </Box>
+           
+           {/* Related Product 3 */}
+           <Box sx={{ minWidth: 280, flex: '0 0 280px' }}>
+             <Box sx={{ 
+               height: 200, 
+               backgroundColor: '#f5f5f5', 
+               borderRadius: 2, 
+               mb: 2,
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center'
+             }}>
+               <Typography color="text.secondary">Related Product 3</Typography>
+             </Box>
+             <Typography variant="h6" sx={{ fontWeight: 500, mb: 1 }}>Related Product 3</Typography>
+             <Typography variant="body1" sx={{ color: 'text.secondary', mb: 1 }}>₨1,800</Typography>
+           </Box>
+           
+           {/* Related Product 4 */}
+           <Box sx={{ minWidth: 280, flex: '0 0 280px' }}>
+             <Box sx={{ 
+               height: 200, 
+               backgroundColor: '#f5f5f5', 
+               borderRadius: 2, 
+               mb: 2,
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center'
+             }}>
+               <Typography color="text.secondary">Related Product 4</Typography>
+             </Box>
+             <Typography variant="h6" sx={{ fontWeight: 500, mb: 1 }}>Related Product 4</Typography>
+             <Typography variant="body1" sx={{ color: 'text.secondary', mb: 1 }}>₨2,100</Typography>
+           </Box>
+         </Box>
+       </Box>
+
+       {/* Additional Content Section */}
+       <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3, mt: 4 }}>
+         <Typography variant="h4" sx={{ fontWeight: 600, mb: 3, textAlign: 'center' }}>
+           Product Details
+         </Typography>
+         <Typography variant="body1" sx={{ lineHeight: 1.8, color: 'text.secondary', mb: 3 }}>
+           This is additional content that appears after the image slider. The page now scrolls normally 
+           showing related products and other content below the main product images.
+         </Typography>
+         <Typography variant="body1" sx={{ lineHeight: 1.8, color: 'text.secondary', mb: 3 }}>
+           When the image slider reaches its last image, the page continues to scroll normally, 
+           allowing users to see all the additional content below.
+         </Typography>
+       </Box>
 
        {/* Footer */}
        <Footer />

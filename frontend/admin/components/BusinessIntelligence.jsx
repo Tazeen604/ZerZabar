@@ -583,3 +583,4 @@ const BusinessIntelligence = () => {
 export default BusinessIntelligence;
 
 
+

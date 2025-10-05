@@ -38,7 +38,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import apiService from "../services/api";
-import PageContainer from "../components/PageContainer";
 
 // Pakistan Districts List
 const PAKISTAN_DISTRICTS = [
@@ -669,7 +668,8 @@ const Checkout = () => {
   }
 
   return (
-    <PageContainer maxWidth="lg" sx={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+    <Box sx={{ pt: { xs: 14, md: 16 }, backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <Box sx={{ maxWidth: 'lg', mx: 'auto', px: { xs: 2, sm: 3, md: 4 } }}>
         {/* Header */}
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography 
@@ -1010,7 +1010,8 @@ const Checkout = () => {
           {snackbarMessage}
         </Alert>
       </Snackbar>
-    </PageContainer>
+      </Box>
+    </Box>
   );
 };
 

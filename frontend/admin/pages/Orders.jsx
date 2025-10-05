@@ -30,6 +30,7 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Grid,
 } from '@mui/material';
 import {
   Search,
@@ -55,6 +56,8 @@ const Orders = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +84,10 @@ const Orders = () => {
         params.append('status', statusFilter);
       }
       
+      // Add sorting parameters
+      params.append('sort_by', sortBy);
+      params.append('sort_order', sortOrder);
+      
       const response = await apiService.get(`/admin/orders?${params.toString()}`);
       
       if (response.success) {
@@ -100,7 +107,7 @@ const Orders = () => {
   // Fetch orders when component mounts or filters change
   useEffect(() => {
     fetchOrders();
-  }, [page, rowsPerPage, searchTerm, statusFilter]);
+  }, [page, rowsPerPage, searchTerm, statusFilter, sortBy, sortOrder]);
 
   // Debounced search
   useEffect(() => {
@@ -154,12 +161,12 @@ const Orders = () => {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'completed':
       case 'delivered':
         return '#4CAF50';
       case 'processing':
-      case 'shipped':
         return '#FF9800';
+      case 'shipped':
+        return '#9C27B0';
       case 'pending':
         return '#2196F3';
       case 'cancelled':
@@ -172,10 +179,10 @@ const Orders = () => {
 
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
-      case 'completed':
       case 'delivered':
         return <CheckCircle />;
       case 'processing':
+        return <Pending />;
       case 'shipped':
         return <LocalShipping />;
       case 'pending':
@@ -293,8 +300,41 @@ const Orders = () => {
             <MenuItem value="processing">Processing</MenuItem>
             <MenuItem value="shipped">Shipped</MenuItem>
             <MenuItem value="delivered">Delivered</MenuItem>
-            <MenuItem value="completed">Completed</MenuItem>
             <MenuItem value="cancelled">Cancelled</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Sort By</InputLabel>
+          <Select
+            label="Sort By"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            sx={{
+              borderRadius: '12px',
+              backgroundColor: '#F5F5F5',
+            }}
+          >
+            <MenuItem value="created_at">Date</MenuItem>
+            <MenuItem value="total_amount">Amount</MenuItem>
+            <MenuItem value="customer_name">Customer</MenuItem>
+            <MenuItem value="status">Status</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl sx={{ minWidth: 120 }}>
+          <InputLabel>Order</InputLabel>
+          <Select
+            label="Order"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            sx={{
+              borderRadius: '12px',
+              backgroundColor: '#F5F5F5',
+            }}
+          >
+            <MenuItem value="desc">Newest First</MenuItem>
+            <MenuItem value="asc">Oldest First</MenuItem>
           </Select>
         </FormControl>
       </Box>
@@ -339,11 +379,23 @@ const Orders = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontSize: '1.2rem' }}>🛍️</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {order.items?.length || 0} items
-                      </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      {order.items && order.items.length > 0 ? (
+                        order.items.slice(0, 2).map((item, index) => (
+                          <Typography key={index} variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
+                            {item.product_name || item.product?.name || 'Unknown Product'}
+                          </Typography>
+                        ))
+                      ) : (
+                        <Typography variant="body2" sx={{ color: '#757575' }}>
+                          No items
+                        </Typography>
+                      )}
+                      {order.items && order.items.length > 2 && (
+                        <Typography variant="caption" sx={{ color: '#757575' }}>
+                          +{order.items.length - 2} more items
+                        </Typography>
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -362,10 +414,14 @@ const Orders = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ color: '#757575' }}>
-                      {typeof order.shipping_address === 'string' 
-                        ? order.shipping_address.substring(0, 30) + '...' 
-                        : 'N/A'}
+                    <Typography variant="body2" sx={{ color: '#757575', maxWidth: 200 }}>
+                      {order.shipping_address ? (
+                        typeof order.shipping_address === 'string' 
+                          ? (order.shipping_address.length > 30 
+                              ? order.shipping_address.substring(0, 30) + '...' 
+                              : order.shipping_address)
+                          : (order.shipping_address.address || order.shipping_address.street || 'N/A')
+                      ) : 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -478,7 +534,7 @@ const Orders = () => {
           <ListItemText>Edit Order</ListItemText>
         </MenuItem>
         <MenuItem
-          onClick={() => handleUpdateStatus('Completed')}
+          onClick={() => handleUpdateStatus('Delivered')}
           sx={{
             '&:hover': {
               backgroundColor: 'rgba(76, 175, 80, 0.1)',
@@ -488,7 +544,7 @@ const Orders = () => {
           <ListItemIcon>
             <CheckCircle sx={{ color: '#4CAF50' }} />
           </ListItemIcon>
-          <ListItemText>Mark as Completed</ListItemText>
+          <ListItemText>Mark as Delivered</ListItemText>
         </MenuItem>
         <MenuItem
           onClick={() => handleUpdateStatus('Cancelled')}
@@ -539,7 +595,13 @@ const Orders = () => {
                       <strong>Phone:</strong> {selectedOrder.customer_phone || 'N/A'}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Address:</strong> {selectedOrder.shipping_address || 'N/A'}
+                      <strong>Address:</strong> {
+                        selectedOrder.shipping_address ? (
+                          typeof selectedOrder.shipping_address === 'string' 
+                            ? selectedOrder.shipping_address
+                            : (selectedOrder.shipping_address.address || selectedOrder.shipping_address.street || 'N/A')
+                        ) : 'N/A'
+                      }
                     </Typography>
                   </Box>
                 </Grid>
@@ -557,6 +619,16 @@ const Orders = () => {
                     <Typography variant="body2">
                       <strong>Items:</strong> {selectedOrder.items?.length || 0} items
                     </Typography>
+                    {selectedOrder.items && selectedOrder.items.length > 0 && (
+                      <Box sx={{ mt: 1 }}>
+                        {selectedOrder.items.map((item, index) => (
+                          <Typography key={index} variant="body2" sx={{ fontSize: '0.875rem', color: '#757575' }}>
+                            • {item.product_name || item.product?.name || 'Unknown Product'} 
+                            (Qty: {item.quantity}, Price: PKR {item.unit_price?.toLocaleString() || '0'})
+                          </Typography>
+                        ))}
+                      </Box>
+                    )}
                     <Typography variant="body2">
                       <strong>Status:</strong> {selectedOrder.status || 'Unknown'}
                     </Typography>

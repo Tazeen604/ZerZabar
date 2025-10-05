@@ -28,14 +28,19 @@ import MenuIcon from "@mui/icons-material/Menu";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchIcon from "@mui/icons-material/Search";
 import PersonIcon from "@mui/icons-material/Person";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import apiService from "../services/api";
+import Logo from "./Logo";
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { getTotalItems } = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  
+  // Check if current page is home page
+  const isHomePage = location.pathname === '/';
   const [categories, setCategories] = useState([]);
   const [shopMenuAnchor, setShopMenuAnchor] = useState(null);
   const [mobileShopExpanded, setMobileShopExpanded] = useState(false);
@@ -43,54 +48,13 @@ const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchCategory, setSearchCategory] = useState("All");
 
-  // Define mega menu categories and subcategories
-  const megaMenuCategories = [
-    {
-      name: "Pants",
-      subcategories: ["Denim Pants", "Cotton Pants"]
-    },
-    {
-      name: "Shirts",
-      subcategories: ["Casual Shirts"]
-    },
-    {
-      name: "T-Shirts",
-      subcategories: ["Polo Tee", "Drop Shoulder Tee", "Plain Tee"]
-    },
-    {
-      name: "Shorts",
-      subcategories: ["Cotton Nicker", "Denim Nicker"]
-    },
-    {
-      name: "Jacket",
-      subcategories: ["Sleeveless Jacket", "Puffer Jacket"]
-    },
-    {
-      name: "Sweat Shirt",
-      subcategories: []
-    },
-    {
-      name: "Casual Coat",
-      subcategories: []
-    },
-    {
-      name: "Hoodies",
-      subcategories: []
-    },
-    {
-      name: "Sweater Zipper",
-      subcategories: []
-    },
-    {
-      name: "Accessories",
-      subcategories: ["Watches", "Belts", "Wallets", "Bags"]
-    }
-  ];
+  // Use API categories instead of hardcoded ones
+  const megaMenuCategories = categories;
 
   const menuItems = [
     { label: "Home", path: "/" },
     { label: "Shop", path: "/shop", hasDropdown: true },
-    { label: "New Arrivals", path: "/#new-arrivals", isAnchor: true },
+    { label: "New Arrivals", path: "/new-arrivals" },
     { label: "About", path: "/about" },
     { label: "Contact", path: "/contact" },
   ];
@@ -138,6 +102,12 @@ const Navbar = () => {
     setMobileShopExpanded(false);
   };
 
+  const handleSubcategoryClick = (categoryId, subcategoryId, subcategoryName) => {
+    navigate(`/shop?category=${categoryId}&subcategory=${subcategoryId}`);
+    setShopMenuAnchor(null);
+    setMobileShopExpanded(false);
+  };
+
   const handleViewAllProducts = () => {
     navigate("/shop");
     setShopMenuAnchor(null);
@@ -146,92 +116,50 @@ const Navbar = () => {
 
   return (
     <Box>
-      {/* Logo Bar - Above Navbar */}
-      <Box
-        sx={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1200,
-          backgroundColor: "rgba(0,0,0,0.0)", // More transparent black background
-          backdropFilter: "blur(12px)",
-          py: 1,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            cursor: "pointer",
-          }}
-          onClick={() => navigate("/")}
-        >
-          <img
-            src="/images/logo.jpg"
-            alt="Zer Zabar Logo"
-            style={{
-              height: "50px",
-              width: "auto",
-              objectFit: "contain",
-            }}
-            onError={(e) => {
-              e.target.style.display = "none";
-              e.target.nextSibling.style.display = "block";
-            }}
-          />
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: "bold",
-              color: "#fff",
-              display: "none",
-              fontSize: "1.8rem",
-            }}
-          >
-            Zer Zabar
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Original Navbar - Below Logo */}
     <AppBar
       position="fixed"
       elevation={0}
       sx={{
         left: "50%",
         transform: "translateX(-50%)",
-          top: "80px", // Position below logo bar
+        top: isHomePage ? "80px" : "16px", // Position below logo on home, reduced margin on other pages
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         width: { xs: "90%", md: "60%" }, // narrower on mobile
         borderRadius: "50px",
-        background: "rgba(0,0,0,0.5)",
+        background: isHomePage ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.6)", // More transparent on other pages
         backdropFilter: "blur(12px)", // glass effect
         boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+        zIndex: 1200, // Lower than logo z-index
       }}
     >
       <Toolbar
         sx={{
+          position: "relative",
           display: "flex",
           justifyContent: { xs: "flex-end", md: "space-between" },
+          alignItems: "center",
           px: { xs: 2, md: 6 },
           width: "100%",
         }}
       >
+        {/* Logo for non-home pages */}
+        {!isHomePage && (
+          <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center" ,ml:4}}>
+            <Logo size="medium" position="static" />
+          </Box>
+        )}
+
         {/* Menu Items - hidden on xs, visible on md+ */}
         <Box
           sx={{
             display: { xs: "none", md: "flex" }, // responsive visibility
-              gap: "2rem",
-            justifyContent: "flex-start",
-              alignItems: "center",
+            gap: "2rem",
+            justifyContent: isHomePage ? "flex-start" : "center", // Left on home, center on other pages
+            alignItems: "center",
             flexGrow: 1,
-            ml: 6, // Increased left margin
+            ml: !isHomePage ? 2 : 6, // Add margin if logo is present
           }}
         >
           {menuItems.map((item, index) => (
@@ -277,9 +205,9 @@ const Navbar = () => {
                         backdropFilter: "blur(12px)",
                         borderRadius: "5px",
                         border: "1px solid rgba(255,255,255,0.1)",
-                        mt: 2, // Added top margin for better positioning
-                        width: "65%",
-                        maxWidth: "750px",
+                        mt: 1.5, // Reduced top margin to place exactly under navbar
+                        width: "63%", // Reduced by 2 points from 65%
+                        maxWidth: "730px", // Reduced by 2 points from 750px
                         left:"50% ! important",
                         boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
                         p: 3, // Increased padding from 1 to 3
@@ -303,8 +231,16 @@ const Navbar = () => {
                         width: "auto",
                         height: "auto",
                         padding: 0,
+                        backgroundColor: "transparent",
+                        borderRadius: 0,
                         "&:hover": {
                           color: "#FFD54F",
+                          backgroundColor: "transparent",
+                        },
+                        "&:focus": {
+                          backgroundColor: "transparent",
+                        },
+                        "&:active": {
                           backgroundColor: "transparent",
                         },
                       }}
@@ -339,14 +275,11 @@ const Navbar = () => {
                           
                           {/* Subcategories */}
                           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
-                            {category.subcategories.length > 0 ? (
+                            {category.subcategories && category.subcategories.length > 0 ? (
                               category.subcategories.map((subcategory, subIndex) => (
                                 <Button
                                   key={subIndex}
-                                  onClick={() => {
-                                    navigate(`/shop?category=${category.name.toLowerCase()}&subcategory=${subcategory.toLowerCase().replace(/\s+/g, '-')}`);
-                                    setShopMenuAnchor(null);
-                                  }}
+                                  onClick={() => handleSubcategoryClick(category.id, subcategory.id, subcategory.name)}
                                   sx={{
                                     color: "#fff",
                                     textTransform: "none",
@@ -361,15 +294,12 @@ const Navbar = () => {
                                     },
                                   }}
                                 >
-                                  {subcategory}
+                                  {subcategory.name}
                                 </Button>
                               ))
                             ) : (
                               <Button
-                                onClick={() => {
-                                  navigate(`/shop?category=${category.name.toLowerCase()}`);
-                                  setShopMenuAnchor(null);
-                                }}
+                                onClick={() => handleCategoryClick(category.id, category.name)}
                                 sx={{
                                   color: "#fff",
                                   textTransform: "none",
@@ -393,7 +323,7 @@ const Navbar = () => {
                     </Box>
                     
                     {/* View All Products Button */}
-                    <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #e0e0e0", px: 2 }}>
+                    <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #e0e0e0", px: 2, display: "flex", justifyContent: "center" }}>
                       <Button
                         onClick={handleViewAllProducts}
                         sx={{
@@ -457,9 +387,9 @@ const Navbar = () => {
           <Box sx={{ 
             display: "flex", 
             alignItems: "center", 
-            gap: 1, 
-            mr: { xs: 1, md: 3 },
-            ml: { xs: "auto", md: 0 } // Ensure it's pushed to the right on mobile
+            gap: 1,
+            ml: "auto", // Push to the right within navbar flow
+            mr: { xs: 1, md: 2 }, // Margin from right edge
           }}>
           {/* Hamburger Menu (only xs) - Show first on mobile */}
           <IconButton
@@ -602,11 +532,7 @@ const Navbar = () => {
                           <Box key={index}>
                           <ListItem
                             button
-                              onClick={() => {
-                                navigate(`/shop?category=${category.name.toLowerCase()}`);
-                                setDrawerOpen(false);
-                                setMobileShopExpanded(false);
-                              }}
+                              onClick={() => handleCategoryClick(category.id, category.name)}
                             sx={{
                               borderRadius: "8px",
                               mb: 0.5,
@@ -627,15 +553,11 @@ const Navbar = () => {
                                 }}
                               />
                             </ListItem>
-                            {category.subcategories.map((subcategory, subIndex) => (
+                            {category.subcategories && category.subcategories.map((subcategory, subIndex) => (
                               <ListItem
                                 key={subIndex}
                                 button
-                                onClick={() => {
-                                  navigate(`/shop?category=${category.name.toLowerCase()}&subcategory=${subcategory.toLowerCase().replace(/\s+/g, '-')}`);
-                                  setDrawerOpen(false);
-                                  setMobileShopExpanded(false);
-                                }}
+                                onClick={() => handleSubcategoryClick(category.id, subcategory.id, subcategory.name)}
                                 sx={{
                                   borderRadius: "8px",
                                   mb: 0.5,
@@ -646,7 +568,7 @@ const Navbar = () => {
                                 }}
                               >
                                 <ListItemText 
-                                  primary={subcategory}
+                                  primary={subcategory.name}
                                   sx={{ 
                                     "& .MuiListItemText-primary": { 
                                       fontSize: "0.8rem",

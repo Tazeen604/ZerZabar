@@ -34,6 +34,7 @@ import {
   Pending,
   Warning,
   TrendingFlat,
+  Error,
 } from '@mui/icons-material';
 import apiService from '../../src/services/api';
 import { useApi } from '../hooks/useApi';
@@ -184,7 +185,7 @@ const Dashboard = () => {
         <EmptyState
           icon={<Error />}
           title="Failed to Load Dashboard"
-          description={error}
+          description={error?.toString() || 'An error occurred while loading the dashboard'}
           actionLabel="Retry"
           onAction={fetchDashboardData}
           variant="error"

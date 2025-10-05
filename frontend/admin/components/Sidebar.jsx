@@ -24,6 +24,7 @@ import {
   ExpandLess,
   Add,
   BarChart,
+  Settings,
 } from '@mui/icons-material';
 
 const Sidebar = ({ open, onToggle }) => {
@@ -62,8 +63,6 @@ const Sidebar = ({ open, onToggle }) => {
       hasSubmenu: true,
       subItems: [
         { text: 'Stock Overview', path: '/admin/inventory' },
-        { text: 'Low Stock', path: '/admin/inventory/low-stock' },
-        { text: 'Stock Reports', path: '/admin/inventory/reports' },
       ],
     },
     {
@@ -81,6 +80,12 @@ const Sidebar = ({ open, onToggle }) => {
       text: 'Reports',
       icon: <BarChart />,
       path: '/admin/reports',
+      hasSubmenu: false,
+    },
+    {
+      text: 'Settings',
+      icon: <Settings />,
+      path: '/admin/settings',
       hasSubmenu: false,
     },
   ];

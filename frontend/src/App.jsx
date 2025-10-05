@@ -11,6 +11,7 @@ import Footer from "./components/Footer";
 import ProductView from "./pages/ProductView";
 import ViewCart from "./pages/ViewCart";
 import Shop from "./pages/Shop";
+import NewArrivals from "./pages/NewArrivals";
 import Checkout from "./pages/Checkout";
 import Contact from "./pages/Contact";
 import { CartProvider } from "./contexts/CartContext";
@@ -62,6 +63,12 @@ function App() {
               <>
                 <Navbar />
                 <Shop />
+              </>
+            } />
+            <Route path="/new-arrivals" element={
+              <>
+                <Navbar />
+                <NewArrivals />
               </>
             } />
             <Route path="/checkout" element={

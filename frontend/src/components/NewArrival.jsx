@@ -1,7 +1,10 @@
 import React from "react";
 import { Box, Typography, Button } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 const NewArrival = () => {
+  const navigate = useNavigate();
+
   return (
     <Box
       id="new-arrivals"
@@ -77,6 +80,7 @@ const NewArrival = () => {
         <Button
           variant="contained"
           size="large"
+          onClick={() => navigate("/new-arrivals")}
           sx={{
             backgroundColor: "#FFD700",
             color: "#333",
