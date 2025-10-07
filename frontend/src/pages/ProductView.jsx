@@ -22,6 +22,7 @@ import { useCart } from "../contexts/CartContext";
 import api from "../services/api";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import Footer from "../components/Footer";
+import { getProductImageUrl, getImageUrl } from "../utils/imageUtils";
 
 const ProductView = () => {
   const { id } = useParams();
@@ -135,7 +136,7 @@ const ProductView = () => {
         try {
           response = await api.getProduct(actualId);
         } catch {
-          const directResponse = await fetch(`http://localhost:8000/api/products/${actualId}`);
+          const directResponse = await fetch(`/api/products/${actualId}`);
           if (directResponse.ok) {
             const directData = await directResponse.json();
             setProduct(directData.data || directData);
@@ -240,7 +241,7 @@ const ProductView = () => {
                 {product.images?.length ? product.images.map((image, idx) => (
                   <Box key={idx} sx={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Box component="img"
-                      src={image.image_path?.startsWith("http") ? image.image_path : `http://localhost:8000/storage/${image.image_path}`}
+                      src={getImageUrl(image.image_path)}
                       alt={`product-${idx + 1}`}
                       sx={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 2 }}
                           />
@@ -462,9 +463,7 @@ const ProductView = () => {
            }}>
              <Box
                component="img"
-               src={product?.images?.[0]?.image_path?.startsWith("http") 
-                 ? product.images[0].image_path 
-                 : `http://localhost:8000/storage/${product?.images?.[0]?.image_path}`}
+               src={getProductImageUrl(product?.images)}
                alt={product?.name}
                             sx={{
                  width: { xs: '100%', sm: 60 }, 

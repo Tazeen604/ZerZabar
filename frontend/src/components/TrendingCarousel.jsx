@@ -18,6 +18,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import api from "../services/api";
+import { getProductImageUrl } from "../utils/imageUtils";
 
 const TrendingCarousel = () => {
   const navigate = useNavigate();
@@ -104,8 +105,10 @@ const TrendingCarousel = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          mb: 4,
-          px: { xs: 2, md: 4 },
+          mb: { xs: 3, md: 4 },
+          px: { xs: 1, sm: 2, md: 4 },
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 2, sm: 0 },
         }}
       >
         {/* Title */}
@@ -129,7 +132,6 @@ const TrendingCarousel = () => {
                 color: "#666",
               }}
             >
-              ®
             </Typography>
           </Typography>
           
@@ -150,7 +152,7 @@ const TrendingCarousel = () => {
         </Box>
 
         {/* Navigation Arrows */}
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1, alignSelf: { xs: "center", sm: "flex-end" } }}>
           <IconButton
             onClick={handlePrevious}
             disabled={currentIndex === 0}
@@ -193,12 +195,13 @@ const TrendingCarousel = () => {
         sx={{
           display: "grid",
           gridTemplateColumns: {
-            xs: "repeat(2, 1fr)",
-            sm: "repeat(3, 1fr)",
-            md: "repeat(4, 1fr)",
+            xs: "repeat(1, 1fr)",
+            sm: "repeat(2, 1fr)",
+            md: "repeat(3, 1fr)",
+            lg: "repeat(4, 1fr)",
           },
-          gap: 3,
-          px: { xs: 2, md: 4 },
+          gap: { xs: 2, sm: 3 },
+          px: { xs: 1, sm: 2, md: 4 },
         }}
       >
         {visibleProducts.map((product, index) => (
@@ -206,15 +209,16 @@ const TrendingCarousel = () => {
             key={product.id}
             sx={{
               position: "relative",
-              borderRadius: "12px",
+              borderRadius: { xs: "8px", sm: "12px" },
               overflow: "hidden",
               backgroundColor: "white",
               boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
               transition: "all 0.3s ease",
               cursor: "pointer",
+              width: "100%",
               "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.15)",
+                transform: { xs: "none", sm: "translateY(-4px)" },
+                boxShadow: { xs: "0 2px 8px rgba(0,0,0,0.1)", sm: "0 8px 25px rgba(0,0,0,0.15)" },
               },
             }}
             onClick={() => handleProductClick(product.id)}
@@ -223,16 +227,12 @@ const TrendingCarousel = () => {
             <Box
               sx={{
                 position: "relative",
-                height: { xs: "200px", md: "250px" },
+                height: { xs: "180px", sm: "200px", md: "250px" },
                 overflow: "hidden",
               }}
             >
               <img
-                src={
-                  product.images?.[0]?.image_path?.startsWith("http")
-                    ? product.images[0].image_path
-                    : `http://localhost:8000/storage/${product.images?.[0]?.image_path || ""}`
-                }
+                src={getProductImageUrl(product.images)}
                 alt={product.name}
                 style={{
                   width: "100%",

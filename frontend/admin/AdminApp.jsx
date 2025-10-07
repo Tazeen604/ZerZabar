@@ -147,11 +147,11 @@ const AdminAppContent = () => {
 const AdminApp = () => {
   return (
     <ThemeProvider>
-        <SettingsProvider>
-          <NotificationProvider>
-            <AdminAppContent />
-          </NotificationProvider>
-        </SettingsProvider>
+      <SettingsProvider>
+        <NotificationProvider>
+          <AdminAppContent />
+        </NotificationProvider>
+      </SettingsProvider>
     </ThemeProvider>
   );
 };

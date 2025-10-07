@@ -31,6 +31,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import PageContainer from "../components/PageContainer";
+import { getCartImageUrl } from "../utils/imageUtils";
 
 const ViewCart = () => {
   const navigate = useNavigate();
@@ -159,7 +160,7 @@ const ViewCart = () => {
                       >
                         {item.image ? (
                           <img
-                            src={`http://localhost:8000/storage/${item.image}`}
+                            src={getCartImageUrl(item.image)}
                             alt={item.name}
                             style={{
                             width: "100%",

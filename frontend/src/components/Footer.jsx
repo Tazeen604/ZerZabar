@@ -57,7 +57,7 @@ const Footer = () => {
                   color: "rgba(255, 255, 255, 0.8)",
                 }}
               >
-                Free shipping on all US orders
+                Free shipping on all orders
               </Typography>
             </Box>
           </Box>
@@ -104,7 +104,7 @@ const Footer = () => {
                   color: "rgba(255, 255, 255, 0.8)",
                 }}
               >
-                30 days money back guarantee
+                07 days money back guarantee
               </Typography>
             </Box>
           </Box>

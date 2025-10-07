@@ -55,6 +55,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../../src/services/api';
+import { getProductImageUrl, getImageUrl } from '../../src/utils/imageUtils';
 
 // Standard size options for ecommerce
 const SIZE_OPTIONS = {
@@ -796,7 +797,7 @@ const ProductManagement = () => {
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Avatar
-                            src={product.images?.[0]?.image_path ? `http://localhost:8000/storage/${product.images[0].image_path}` : null}
+                            src={getProductImageUrl(product.images)}
                             sx={{ width: 50, height: 50 }}
                           >
                             <ImageIcon />
@@ -1364,7 +1365,7 @@ const ProductManagement = () => {
                         {productForm.images.map((image, index) => (
                       <Box key={`existing-${image.id || index}`} sx={{ position: 'relative' }}>
                         <img
-                          src={image.image_path ? `http://localhost:8000/storage/${image.image_path}` : 'https://via.placeholder.com/100x100?text=No+Image'}
+                          src={getImageUrl(image.image_path)}
                           alt={image.alt_text || `Existing image ${index + 1}`}
                           style={{
                             width: '100px',

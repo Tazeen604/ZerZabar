@@ -32,6 +32,7 @@ import {
   StarBorder,
 } from '@mui/icons-material';
 import apiService from '../../src/services/api';
+import { getProductImageUrl } from '../../src/utils/imageUtils';
 
 const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -220,7 +221,7 @@ const Products = () => {
                   }}
                 >
                   <img
-                    src={product.images?.[0]?.image_path ? `http://localhost:8000/storage/${product.images[0].image_path}` : 'https://via.placeholder.com/400x200?text=No+Image'}
+                    src={getProductImageUrl(product.images)}
                     alt={product.name}
                     style={{
                       width: '100%',

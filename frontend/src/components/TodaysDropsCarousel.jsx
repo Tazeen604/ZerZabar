@@ -18,6 +18,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import api from "../services/api";
+import { getProductImageUrl } from "../utils/imageUtils";
 
 const TodaysDropsCarousel = () => {
   const navigate = useNavigate();
@@ -128,10 +129,12 @@ const TodaysDropsCarousel = () => {
   return (
     <Box
       sx={{
-        backgroundColor: "white",
+        backgroundColor: "#f8f9fa",
         py: 6,
         px: { xs: 2, md: 4 },
+        borderRadius: "20px",
         mx: { xs: 2, md: 4 },
+       
         my: 4,
       }}
     >
@@ -141,8 +144,10 @@ const TodaysDropsCarousel = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          mb: 4,
-          px: { xs: 2, md: 4 },
+          mb: { xs: 3, md: 4 },
+          px: { xs: 1, sm: 2, md: 4 },
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 2, sm: 0 },
         }}
       >
         {/* Title */}
@@ -178,7 +183,7 @@ const TodaysDropsCarousel = () => {
         </Box>
 
         {/* Navigation Arrows */}
-        <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
+        <Box sx={{ display: "flex", gap: 1, alignSelf: { xs: "center", sm: "flex-end" } }}>
           <IconButton
             onClick={handlePrevious}
             disabled={currentIndex === 0}
@@ -218,10 +223,11 @@ const TodaysDropsCarousel = () => {
       <Box
         sx={{
           display: "flex",
-          gap: 1.5,
-          mb: 4,
-          px: { xs: 2, md: 4 },
+          gap: { xs: 1, sm: 1.5 },
+          mb: { xs: 3, md: 4 },
+          px: { xs: 1, sm: 2, md: 4 },
           flexWrap: "wrap",
+          justifyContent: { xs: "center", sm: "flex-start" },
         }}
       >
         {[
@@ -238,13 +244,13 @@ const TodaysDropsCarousel = () => {
               color: "#000",
               border: "1px solid #e0e0e0",
               borderRadius: "4px",
-              px: 2,
+              px: { xs: 1.5, sm: 2 },
               py: 0.5,
-              fontSize: "0.8rem",
+              fontSize: { xs: "0.7rem", sm: "0.8rem" },
               fontWeight: 400,
               textTransform: "none",
               minWidth: "auto",
-              height: "32px",
+              height: { xs: "28px", sm: "32px" },
               "&:hover": {
                 backgroundColor: "#f5f5f5",
               },
@@ -260,12 +266,13 @@ const TodaysDropsCarousel = () => {
         sx={{
           display: "grid",
           gridTemplateColumns: {
-            xs: "repeat(2, 1fr)",
-            sm: "repeat(3, 1fr)",
-            md: "repeat(4, 1fr)",
+            xs: "repeat(1, 1fr)",
+            sm: "repeat(2, 1fr)",
+            md: "repeat(3, 1fr)",
+            lg: "repeat(4, 1fr)",
           },
-          gap: 3,
-          px: { xs: 2, md: 4 },
+          gap: { xs: 2, sm: 3 },
+          px: { xs: 1, sm: 2, md: 4 },
         }}
       >
         {visibleProducts.map((product, index) => {
@@ -276,16 +283,17 @@ const TodaysDropsCarousel = () => {
               key={product?.id || index}
               sx={{
                 position: "relative",
-                borderRadius: "8px",
+                borderRadius: { xs: "6px", sm: "8px" },
                 overflow: "hidden",
                 backgroundColor: "white",
                 boxShadow: "none",
                 border: "1px solid #f0f0f0",
                 transition: "all 0.3s ease",
                 cursor: "pointer",
+                width: "100%",
                 "&:hover": {
-                  transform: "translateY(-2px)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  transform: { xs: "none", sm: "translateY(-2px)" },
+                  boxShadow: { xs: "none", sm: "0 4px 12px rgba(0,0,0,0.1)" },
                 },
               }}
               onClick={() => handleProductClick(product?.id)}
@@ -294,16 +302,12 @@ const TodaysDropsCarousel = () => {
               <Box
                 sx={{
                   position: "relative",
-                  height: { xs: "200px", md: "250px" },
+                  height: { xs: "180px", sm: "200px", md: "250px" },
                   overflow: "hidden",
                 }}
               >
                 <img
-                  src={
-                    product.images?.[0]?.image_path?.startsWith("http")
-                      ? product.images[0].image_path
-                      : `http://localhost:8000/storage/${product.images?.[0]?.image_path || ""}`
-                  }
+                  src={getProductImageUrl(product.images)}
                   alt={product?.name || 'Product'}
                   style={{
                     width: "100%",
@@ -427,36 +431,7 @@ const TodaysDropsCarousel = () => {
                 >
                   {product?.name || 'Unnamed Product'}
                 </Typography>
-
-                {/* Store Info */}
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "#999",
-                    fontSize: "0.75rem",
-                    mb: 1,
-                    display: "block",
-                  }}
-                >
-                  From: Zer Zabar Store
-                </Typography>
-
-                {/* Sizes */}
-                {product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0 && (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: "#999",
-                      fontSize: "0.75rem",
-                      mb: 1,
-                      display: "block",
-                    }}
-                  >
-                    Sizes: {product.sizes.slice(0, 3).join(", ")}
-                    {product.sizes.length > 3 && "..."}
-                  </Typography>
-                )}
-
+                
                 {/* Pricing */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
                   <Typography

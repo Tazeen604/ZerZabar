@@ -24,6 +24,7 @@ import { useCart } from "../contexts/CartContext";
 import apiService from "../services/api";
 import PageContainer from "../components/PageContainer";
 import Footer from "../components/Footer";
+import { getProductImageUrl } from "../utils/imageUtils";
 
 const Shop = () => {
   const [products, setProducts] = useState([]);
@@ -558,7 +559,7 @@ const fetchCategories = async () => {
                     }}
                   >
                     <img
-                      src={product.images?.[0]?.image_path ? `http://localhost:8000/storage/${product.images[0].image_path}` : "https://via.placeholder.com/280x320?text=No+Image"}
+                      src={getProductImageUrl(product.images)}
                       alt={product.name}
                       style={{
                         width: '280px', // Fixed width

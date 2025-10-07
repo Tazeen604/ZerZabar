@@ -197,104 +197,65 @@ const Settings = () => {
       </Box>
 
       {/* Settings Categories */}
-      <Grid container spacing={4} justifyContent="center">
+      <Grid container spacing={3}>
         {settingsCategories.map((category, index) => (
-          <Grid item xs={12} sm={10} md={5} lg={4} xl={3} key={index}>
-            <Card 
-              sx={{ 
-                height: '100%',
-                minHeight: 400,
-                display: 'flex',
-                flexDirection: 'column',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
-                }
-              }}
-            >
+          <Grid item xs={12} md={6} key={index}>
+            <Card sx={{ height: '100%' }}>
               <CardHeader
                 avatar={
                   <Box
                     sx={{
                       backgroundColor: category.color,
                       borderRadius: '50%',
-                      p: 2,
+                      p: 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      minWidth: 60,
-                      minHeight: 60,
                     }}
                   >
-                    {React.cloneElement(category.icon, { 
-                      sx: { fontSize: 28, color: 'white' } 
-                    })}
+                    {category.icon}
                   </Box>
                 }
                 title={
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                     {category.title}
                   </Typography>
                 }
-                sx={{ 
-                  pb: 2,
-                  '& .MuiCardHeader-content': {
-                    minWidth: 0,
-                  }
-                }}
+                sx={{ pb: 1 }}
               />
-              <CardContent sx={{ flexGrow: 1, pt: 0 }}>
-                <List sx={{ width: '100%' }}>
+              <CardContent>
+                <List dense>
                   {category.settings.map((setting, settingIndex) => (
                     <React.Fragment key={settingIndex}>
-                      <ListItem 
-                        sx={{ 
-                          px: 0, 
-                          py: 2,
-                          flexDirection: 'column',
-                          alignItems: 'flex-start',
-                          gap: 1
-                        }}
-                      >
-                        <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', flex: 1 }}>
-                            {setting.label}
-                          </Typography>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemText
+                          primary={setting.label}
+                          secondary={setting.description}
+                          primaryTypographyProps={{ fontWeight: 'medium' }}
+                          secondaryTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
+                        />
+                        <ListItemSecondaryAction>
                           {setting.type === 'boolean' ? (
                             <Switch
                               checked={settings[setting.key]}
                               onChange={(e) => handleInputChange(setting.key, e.target.checked)}
                               color="primary"
-                              size="medium"
                             />
                           ) : setting.type === 'select' ? (
                             <Chip
                               label={settings[setting.key]}
                               onClick={() => handleEditDialog(setting.key, settings[setting.key])}
-                              sx={{ 
-                                cursor: 'pointer',
-                                minWidth: 80,
-                                '&:hover': {
-                                  backgroundColor: 'primary.light',
-                                  color: 'white'
-                                }
-                              }}
+                              sx={{ cursor: 'pointer' }}
                             />
                           ) : setting.type === 'color' ? (
                             <Box
                               sx={{
-                                width: 50,
-                                height: 50,
+                                width: 40,
+                                height: 40,
                                 backgroundColor: settings[setting.key],
-                                borderRadius: 2,
-                                border: '3px solid #ddd',
+                                borderRadius: 1,
+                                border: '2px solid #ddd',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                '&:hover': {
-                                  transform: 'scale(1.1)',
-                                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                                }
                               }}
                               onClick={() => handleEditDialog(setting.key, settings[setting.key])}
                             />
@@ -302,32 +263,12 @@ const Settings = () => {
                             <Chip
                               label={settings[setting.key]}
                               onClick={() => handleEditDialog(setting.key, settings[setting.key])}
-                              sx={{ 
-                                cursor: 'pointer',
-                                minWidth: 60,
-                                '&:hover': {
-                                  backgroundColor: 'primary.light',
-                                  color: 'white'
-                                }
-                              }}
+                              sx={{ cursor: 'pointer' }}
                             />
                           )}
-                        </Box>
-                        <Typography 
-                          variant="body2" 
-                          color="text.secondary" 
-                          sx={{ 
-                            mt: 1,
-                            lineHeight: 1.4,
-                            fontSize: '0.875rem'
-                          }}
-                        >
-                          {setting.description}
-                        </Typography>
+                        </ListItemSecondaryAction>
                       </ListItem>
-                      {settingIndex < category.settings.length - 1 && (
-                        <Divider sx={{ my: 1 }} />
-                      )}
+                      {settingIndex < category.settings.length - 1 && <Divider />}
                     </React.Fragment>
                   ))}
                 </List>

@@ -406,7 +406,7 @@ const Navbar = () => {
           <IconButton
             onClick={() => navigate("/cart")}
             sx={{
-              backgroundColor: "#FFC107",
+              backgroundColor: "#FFD700",
               color: "#000",
               "&:hover": { backgroundColor: "#e6ac00" },
               order: { xs: 2, md: 1 } // Cart button comes after hamburger on mobile

@@ -22,6 +22,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import apiService from "../services/api";
+import { getProductImageUrl } from "../utils/imageUtils";
 
 const ProductCarousel = () => {
   const [products, setProducts] = useState([]);
@@ -300,7 +301,7 @@ const ProductCarousel = () => {
                 }}
               >
                 <img
-                  src={product.images?.[0]?.image_path ? `http://localhost:8000/storage/${product.images[0].image_path}` : "https://via.placeholder.com/400x400?text=No+Image"}
+                  src={getProductImageUrl(product.images)}
                   alt={product.name}
                   style={{
                     width: "100%",

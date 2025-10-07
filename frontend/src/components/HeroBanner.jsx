@@ -93,10 +93,22 @@ const HeroBanner = () => {
             color="warning"
             size="large"
             sx={{
-              px: { xs: 3, md: 5 },
-              py: { xs: 1, md: 1.5 },
-              fontSize: { xs: "0.9rem", md: "1.1rem" },
-              borderRadius: "30px",
+              backgroundColor: "#FFD700",
+            color: "#333",
+            fontWeight: "bold",
+            px: { xs: 4, md: 6 },
+            py: { xs: 1.5, md: 2 },
+            borderRadius: "30px",
+            fontSize: { xs: "1rem", md: "1.2rem" },
+            textTransform: "none",
+            boxShadow: "0 8px 25px rgba(0,0,0,0.5)", // Stronger shadow
+            minWidth: { xs: "140px", md: "auto" },
+            "&:hover": {
+              backgroundColor: "#E6C200",
+              transform: "scale(1.05)",
+              boxShadow: "0 12px 35px rgba(0,0,0,0.6)",
+            },
+            transition: "all 0.3s ease",
             }}
           >
             Shop Now

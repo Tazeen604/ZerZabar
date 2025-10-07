@@ -137,8 +137,8 @@ const TwoCardSection = () => {
         {/* Content - Top Right Positioned */}
         <Box sx={{ 
           position: "absolute", 
-          top: "10%", 
-          right: "10%", 
+          bottom: "10%", 
+          right: "20%", 
           zIndex: 2, 
           textAlign: "right", 
           maxWidth: "400px", 
@@ -155,7 +155,7 @@ const TwoCardSection = () => {
               letterSpacing: "0.05em",
             }}
           >
-            TOP SELLER PRODUCTS
+            SUMMER COLLECTION
           </Typography>
           
           <Typography

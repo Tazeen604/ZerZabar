@@ -128,34 +128,78 @@ const Sidebar = ({ open, onToggle }) => {
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: open ? 'space-between' : 'center',
+          justifyContent: 'center',
           p: 2,
           minHeight: 64,
+          position: 'relative',
         }}
       >
         {open && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <img
+              src="/images/logo.jpg"
+              alt="Zer Zabar Logo"
+              style={{
+                height: '40px',
+                width: 'auto',
+                maxWidth: '120px',
+                objectFit: 'contain',
+              }}
+              onError={(e) => {
+                // Fallback to text if image fails to load
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'block';
+              }}
+            />
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 'bold',
+                color: '#FFFFFF',
+                display: 'none', // Hidden by default, shown if image fails
+              }}
+            >
+              Zer Zabar
+            </Typography>
+          </Box>
+        )}
+        {!open && (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+            <img
+              src="/images/logo.jpg"
+              alt="Zer Zabar Logo"
+              style={{
+                height: '30px',
+                width: 'auto',
+                maxWidth: '40px',
+                objectFit: 'contain',
+              }}
+              onError={(e) => {
+                // Fallback to icon if image fails to load
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
             <Box
               sx={{
-                width: 32,
-                height: 32,
+                width: 30,
+                height: 30,
                 backgroundColor: '#FFD700',
-                borderRadius: '8px',
-                display: 'flex',
+                borderRadius: '6px',
+                display: 'none',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <ShoppingCart sx={{ color: '#2C2C2C', fontSize: 20 }} />
+              <ShoppingCart sx={{ color: '#2C2C2C', fontSize: 16 }} />
             </Box>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#FFFFFF' }}>
-              Zer Zabar
-            </Typography>
           </Box>
         )}
         <IconButton
           onClick={onToggle}
           sx={{
+            position: 'absolute',
+            right: 8,
             color: '#FFFFFF',
             '&:hover': {
               backgroundColor: 'rgba(255, 255, 255, 0.1)',
