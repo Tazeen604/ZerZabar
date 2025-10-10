@@ -33,8 +33,10 @@ const HeroBanner = () => {
         }}
       />
 
-      {/* Logo Section - Above Content */}
-      <Logo size="large" position="absolute" />
+      {/* Logo Section - Above Content - Hidden on mobile */}
+      <Box sx={{ display: { xs: "none", md: "block" } }}>
+        <Logo size="large" position="absolute" />
+      </Box>
 
       {/* Content Wrapper - Positioned below navbar */}
       <Box

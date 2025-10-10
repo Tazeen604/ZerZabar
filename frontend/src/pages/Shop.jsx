@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Container,
@@ -25,6 +25,7 @@ import apiService from "../services/api";
 import PageContainer from "../components/PageContainer";
 import Footer from "../components/Footer";
 import { getProductImageUrl } from "../utils/imageUtils";
+import FilterMegaPanel from "../components/FilterMegaPanel";
 
 const Shop = () => {
   const [products, setProducts] = useState([]);
@@ -41,6 +42,10 @@ const Shop = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [selectedColors, setSelectedColors] = useState([]);
+  const [selectedCollections, setSelectedCollections] = useState([]);
 
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -185,8 +190,24 @@ const fetchCategories = async () => {
   };
 
   const handleSortChange = (event) => {
-    setSortBy(event.target.value);
+    const value = event.target.value;
+    if (value === 'price_low') {
+      setSortBy('price');
+      setSortOrder('asc');
+    } else if (value === 'price_high') {
+      setSortBy('price');
+      setSortOrder('desc');
+    } else {
+      setSortBy(value);
+      setSortOrder('desc');
+    }
     setCurrentPage(1);
+  };
+
+  const getSortDisplayValue = () => {
+    if (sortBy === 'price' && sortOrder === 'asc') return 'price_low';
+    if (sortBy === 'price' && sortOrder === 'desc') return 'price_high';
+    return sortBy;
   };
 
   const handleProductClick = (productId) => {
@@ -216,6 +237,33 @@ const fetchCategories = async () => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const toggleSize = (s) => setSelectedSizes(prev => prev.includes(s) ? prev.filter(x=>x!==s) : [...prev, s]);
+  const toggleColor = (c) => setSelectedColors(prev => prev.includes(c) ? prev.filter(x=>x!==c) : [...prev, c]);
+  const toggleCollection = (col) => setSelectedCollections(prev => prev.includes(col) ? prev.filter(x=>x!==col) : [...prev, col]);
+  const clearAllFilters = () => { setSelectedSizes([]); setSelectedColors([]); setSelectedCollections([]); };
+
+  const derivedSizes = Array.from(new Set(products.flatMap(p => Array.isArray(p.sizes)? p.sizes: [])));
+  const derivedColors = Array.from(new Set(products.flatMap(p => Array.isArray(p.colors)? p.colors: []))).map(c => ({ value: c, label: c }));
+
+  const applyPanel = () => { setPanelOpen(false); setCurrentPage(1); };
+
+  const filteredProducts = useMemo(() => {
+    let list = products || [];
+    if (selectedColors.length) {
+      list = list.filter(p => {
+        const colors = Array.isArray(p.colors) ? p.colors : [];
+        return colors.some(c => selectedColors.includes(c));
+      });
+    }
+    if (selectedSizes.length) {
+      list = list.filter(p => {
+        const sizes = Array.isArray(p.sizes) ? p.sizes : [];
+        return sizes.some(s => selectedSizes.includes(s));
+      });
+    }
+    return list;
+  }, [products, selectedColors, selectedSizes]);
 
   console.log('Shop component render - loading:', loading, 'products:', products, 'products.length:', products.length);
 
@@ -254,237 +302,73 @@ const fetchCategories = async () => {
 
       {/* Filters */}
       <Box sx={{ mb: 3, py: 2, borderBottom: '1px solid #f0f0f0' }}>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+        {/* Top bar right link */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 1, md: 0 } }}>
+          <Box sx={{ display: { xs: 'none', md: 'block' } }} />
+          <Button onClick={() => setPanelOpen(true)} sx={{ textTransform: 'none', color: '#000', fontSize: '0.9rem' }}>Sort and Filter</Button>
+        </Box>
+
+        {/* Mobile layout */}
+        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
           <TextField
               placeholder="Search..."
             value={searchTerm}
             onChange={handleSearch}
               size="small"
-              sx={{ 
-                minWidth: 180,
-                '& .MuiOutlinedInput-root': {
-                  fontSize: '0.85rem',
-                  borderRadius: 0,
-                }
-              }}
-            InputProps={{
-                startAdornment: <Search sx={{ mr: 0.5, color: '#666', fontSize: '18px' }} />,
-            }}
+            fullWidth
+            sx={{ mb: 1.5, '& .MuiOutlinedInput-root': { fontSize: '0.85rem', borderRadius: 0 } }}
+            InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: '#666', fontSize: '18px' }} /> }}
           />
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <FormControl size="small" sx={{ flex: 1 }}>
+              <InputLabel shrink={true}>Category</InputLabel>
+              <Select value={selectedCategory} onChange={handleCategoryChange} label="Category" displayEmpty>
+                <MenuItem value="">All Products</MenuItem>
+                {categories.map((category) => (<MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
 
+        {/* Desktop layout */}
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1.5, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+            <TextField placeholder="Search..." value={searchTerm} onChange={handleSearch} size="small" sx={{ minWidth: 180, '& .MuiOutlinedInput-root': { fontSize: '0.85rem', borderRadius: 0 } }} InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: '#666', fontSize: '18px' }} /> }} />
             <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel 
-                shrink={true}
-                sx={{ 
-                  fontSize: '0.85rem',
-                  color: '#666',
-                  '&.Mui-focused': {
-                    color: '#FFD700',
-                  }
-                }}
-              >Category</InputLabel>
-            <Select
-              value={selectedCategory}
-              onChange={handleCategoryChange}
-              label="Category"
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      '& .MuiMenuItem-root.Mui-selected': {
-                        backgroundColor: '#fff8e1',
-                        color: '#FFD700',
-                        '&:hover': {
-                          backgroundColor: '#fff3c4',
-                        },
-                      },
-                    },
-                  },
-                }}
-                sx={{ 
-                  fontSize: '0.85rem',
-                  borderRadius: '8px',
-                  backgroundColor: '#fafafa',
-                  '&:hover': {
-                    backgroundColor: '#f5f5f5',
-                  },
-                  '&.Mui-focused': {
-                    backgroundColor: '#fff',
-                    boxShadow: '0 0 0 2px rgba(255, 215, 0, 0.2)',
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#FFD700',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#FFD700',
-                  },
-                }}
-            >
-                <MenuItem value="" sx={{ 
-                  fontSize: '0.85rem',
-                  '&:hover': {
-                    backgroundColor: '#fff8e1',
-                    color: '#FFD700',
-                  },
-                  '&.Mui-selected': {
-                    backgroundColor: '#fff8e1',
-                    color: '#FFD700',
-                    '&:hover': {
-                      backgroundColor: '#fff3c4',
-                    },
-                  },
-                }}>All Products</MenuItem>
-              {categories.map((category) => (
-                  <MenuItem key={category.id} value={category.id} sx={{ 
-                    fontSize: '0.85rem',
-                    '&:hover': {
-                      backgroundColor: '#fff8e1',
-                      color: '#FFD700',
-                    },
-                    '&.Mui-selected': {
-                      backgroundColor: '#fff8e1',
-                      color: '#FFD700',
-                      '&:hover': {
-                        backgroundColor: '#fff3c4',
-                      },
-                    },
-                  }}>
-                  {category.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel 
-                shrink={true}
-                sx={{ 
-                  fontSize: '0.85rem',
-                  color: '#666',
-                  '&.Mui-focused': {
-                    color: '#FFD700',
-                  }
-                }}
-              >Sort</InputLabel>
-            <Select
-              value={sortBy}
-              onChange={handleSortChange}
-                label="Sort"
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      '& .MuiMenuItem-root.Mui-selected': {
-                        backgroundColor: '#fff8e1',
-                        color: '#FFD700',
-                        '&:hover': {
-                          backgroundColor: '#fff3c4',
-                        },
-                      },
-                    },
-                  },
-                }}
-                sx={{ 
-                  fontSize: '0.85rem',
-                  borderRadius: '8px',
-                  backgroundColor: '#fafafa',
-                  '&:hover': {
-                    backgroundColor: '#f5f5f5',
-                  },
-                  '&.Mui-focused': {
-                    backgroundColor: '#fff',
-                    boxShadow: '0 0 0 2px rgba(255, 215, 0, 0.2)',
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#FFD700',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#FFD700',
-                  },
-                }}
-              >
-                <MenuItem value="created_at" sx={{ 
-                  fontSize: '0.85rem',
-                  '&:hover': {
-                    backgroundColor: '#fff8e1',
-                    color: '#FFD700',
-                  },
-                  '&.Mui-selected': {
-                    backgroundColor: '#fff8e1',
-                    color: '#FFD700',
-                    '&:hover': {
-                      backgroundColor: '#fff3c4',
-                    },
-                  },
-                }}>Newest</MenuItem>
-                <MenuItem value="name" sx={{ 
-                  fontSize: '0.85rem',
-                  '&:hover': {
-                    backgroundColor: '#fff8e1',
-                    color: '#FFD700',
-                  },
-                  '&.Mui-selected': {
-                    backgroundColor: '#fff8e1',
-                    color: '#FFD700',
-                    '&:hover': {
-                      backgroundColor: '#fff3c4',
-                    },
-                  },
-                }}>Name</MenuItem>
-                <MenuItem value="price" sx={{ 
-                  fontSize: '0.85rem',
-                  '&:hover': {
-                    backgroundColor: '#fff8e1',
-                    color: '#FFD700',
-                  },
-                  '&.Mui-selected': {
-                    backgroundColor: '#fff8e1',
-                    color: '#FFD700',
-                    '&:hover': {
-                      backgroundColor: '#fff3c4',
-                    },
-                  },
-                }}>Price</MenuItem>
+              <InputLabel shrink={true}>Category</InputLabel>
+              <Select value={selectedCategory} onChange={handleCategoryChange} label="Category" displayEmpty>
+                <MenuItem value="">All Products</MenuItem>
+                {categories.map((category) => (<MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>))}
             </Select>
           </FormControl>
           </Box>
-
-          <Button
-            variant="text"
-            onClick={() => {
-              setSearchTerm("");
-              setSelectedCategory("");
-              setSortBy("created_at");
-              setCurrentPage(1);
-            }}
-            sx={{
-              fontSize: '0.8rem',
-              color: '#666',
-              textTransform: 'none',
-              minWidth: 'auto',
-              px: 1,
-              '&:hover': {
-                backgroundColor: 'transparent',
-                textDecoration: 'underline',
-              }
-            }}
-          >
-            Clear all
-          </Button>
+          <Button variant="text" onClick={() => { setSearchTerm(""); setSelectedCategory(""); setSortBy("created_at"); setSortOrder('desc'); setCurrentPage(1); }} sx={{ fontSize: '0.8rem', color: '#666', textTransform: 'none', minWidth: 'auto', px: 1 }}>Clear all</Button>
         </Box>
       </Box>
+
+      <FilterMegaPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        sizes={derivedSizes}
+        colors={derivedColors}
+        collections={[]}
+        sortValue={getSortDisplayValue()}
+        onSortChange={(v)=>{ handleSortChange({ target: { value: v } }); }}
+        selectedSizes={selectedSizes}
+        selectedColors={selectedColors}
+        selectedCollections={selectedCollections}
+        onToggleSize={toggleSize}
+        onToggleColor={toggleColor}
+        onToggleCollection={toggleCollection}
+        onClearAll={clearAllFilters}
+        onApply={applyPanel}
+      />
 
       {/* Product Count */}
       {!loading && !isInitialLoad && (
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
-            {products.length} {products.length === 1 ? 'product' : 'products'}
+            {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
           </Typography>
         </Box>
       )}
@@ -495,7 +379,7 @@ const fetchCategories = async () => {
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
             <CircularProgress />
           </Box>
-        ) : products.length === 0 ? (
+        ) : filteredProducts.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <Typography variant="h6" sx={{ color: '#666' }}>
               No products found
@@ -511,7 +395,7 @@ const fetchCategories = async () => {
             sx={{ 
               width: '100%',
               margin: 0,
-              justifyContent: 'center', // Center the grid items
+              justifyContent: 'center',
               '& .MuiGrid-item': {
                 paddingLeft: '8px',
                 paddingTop: '8px',
@@ -520,26 +404,26 @@ const fetchCategories = async () => {
               }
             }}
           >
-            {products.map((product) => (
-              <Grid item xs={12} sm={6} md={3} lg={3} xl={3} key={product.id} sx={{ 
+            {filteredProducts.map((product) => (
+              <Grid item xs={6} sm={6} md={3} lg={3} xl={3} key={product.id} sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
-                minWidth: '280px', // Minimum width for consistency
+                minWidth: { xs: 'auto', sm: '280px' },
               }}>
                 <Card
                   sx={{
-                    height: '470px', // Increased height for better button spacing
-                    width: '280px', // Fixed width for all cards
-                    minWidth: '280px', // Ensure minimum width
-                    maxWidth: '280px', // Prevent width expansion
+                    height: '470px',
+                    width: { xs: '47vw', sm: '280px' },
+                    minWidth: { xs: 'auto', sm: '280px' },
+                    maxWidth: { xs: '47vw', sm: '280px' },
                     display: 'flex',
                     flexDirection: 'column',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    borderRadius: 0, // Sharp corners like Zara/H&M
+                    borderRadius: 0,
                     boxShadow: 'none',
                     border: '1px solid #f0f0f0',
-                    flexShrink: 0, // Prevent shrinking
+                    flexShrink: 0,
                     '&:hover': {
                       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     },
@@ -549,24 +433,24 @@ const fetchCategories = async () => {
                   <Box
                     sx={{
                       position: 'relative',
-                      width: '280px', // Fixed width matching card
-                      height: '320px', // Increased height for better proportions
-                      minHeight: '320px', // Ensure minimum height
-                      maxHeight: '320px', // Prevent height expansion
+                      width: { xs: '47vw', sm: '280px' },
+                      height: '320px',
+                      minHeight: '320px',
+                      maxHeight: '320px',
                       overflow: 'hidden',
                       backgroundColor: '#f9f9f9',
-                      flexShrink: 0, // Prevent shrinking
+                      flexShrink: 0,
                     }}
                   >
                     <img
                       src={getProductImageUrl(product.images)}
                       alt={product.name}
                       style={{
-                        width: '280px', // Fixed width
-                        height: '320px', // Fixed height
+                        width: '100%',
+                        height: '320px',
                         objectFit: 'cover',
                         objectPosition: 'center',
-                        display: 'block', // Prevent inline spacing issues
+                        display: 'block',
                       }}
                     />
                   </Box>
@@ -624,7 +508,7 @@ const fetchCategories = async () => {
                           fontSize: '0.9rem',
                         }}
                       >
-                        ₨{product.sale_price || product.price}
+                        ₨{Math.round(product.sale_price || product.price)}
                       </Typography>
                       {product.sale_price && (
                         <Typography
@@ -635,7 +519,7 @@ const fetchCategories = async () => {
                             fontSize: '0.8rem',
                           }}
                         >
-                          ₨{product.price}
+                          ₨{Math.round(product.price)}
                         </Typography>
                       )}
                     </Box>

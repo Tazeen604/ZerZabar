@@ -26,6 +26,27 @@ const TrendingCarousel = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [screenSize, setScreenSize] = useState('desktop');
+  const [hoveredProduct, setHoveredProduct] = useState(null);
+
+  // Handle screen size changes
+  useEffect(() => {
+    const handleResize = () => {
+      const newScreenSize = window.innerWidth < 600 ? 'mobile' : 
+                           window.innerWidth < 960 ? 'tablet' : 
+                           window.innerWidth < 1200 ? 'desktop' : 'large';
+      
+      if (newScreenSize !== screenSize) {
+        setScreenSize(newScreenSize);
+        // Reset to first item when screen size changes to avoid index issues
+        setCurrentIndex(0);
+      }
+    };
+
+    handleResize(); // Set initial size
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [screenSize]);
 
   // Fetch trending products
   useEffect(() => {
@@ -48,14 +69,20 @@ const TrendingCarousel = () => {
 
   // Navigation handlers
   const handlePrevious = () => {
+    const itemsPerView = screenSize === 'mobile' ? 1 : 
+                        screenSize === 'tablet' ? 2 : 
+                        screenSize === 'desktop' ? 3 : 4;
     setCurrentIndex((prev) => 
-      prev === 0 ? Math.max(0, products.length - 4) : prev - 1
+      prev === 0 ? Math.max(0, products.length - itemsPerView) : prev - 1
     );
   };
 
   const handleNext = () => {
+    const itemsPerView = screenSize === 'mobile' ? 1 : 
+                        screenSize === 'tablet' ? 2 : 
+                        screenSize === 'desktop' ? 3 : 4;
     setCurrentIndex((prev) => 
-      prev >= products.length - 4 ? 0 : prev + 1
+      prev >= products.length - itemsPerView ? 0 : prev + 1
     );
   };
 
@@ -78,6 +105,16 @@ const TrendingCarousel = () => {
     navigate(`/product/${productId}`);
   };
 
+  // Handle mobile touch events
+  const handleTouchStart = (productId) => {
+    setHoveredProduct(productId);
+  };
+
+  const handleTouchEnd = () => {
+    // Delay to allow button clicks
+    setTimeout(() => setHoveredProduct(null), 150);
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
@@ -86,7 +123,15 @@ const TrendingCarousel = () => {
     );
   }
 
-  const visibleProducts = products.slice(currentIndex, currentIndex + 4);
+  // Show different number of products based on screen size
+  const getVisibleProducts = () => {
+    const itemsPerView = screenSize === 'mobile' ? 1 : 
+                        screenSize === 'tablet' ? 2 : 
+                        screenSize === 'desktop' ? 3 : 4;
+    return products.slice(currentIndex, currentIndex + itemsPerView);
+  };
+
+  const visibleProducts = getVisibleProducts();
 
   return (
     <Box
@@ -151,14 +196,16 @@ const TrendingCarousel = () => {
           </Typography>
         </Box>
 
-        {/* Navigation Arrows */}
-        <Box sx={{ display: "flex", gap: 1, alignSelf: { xs: "center", sm: "flex-end" } }}>
+        {/* Navigation Arrows - Hidden on mobile */}
+        <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 1, alignSelf: "flex-end" }}>
           <IconButton
             onClick={handlePrevious}
             disabled={currentIndex === 0}
             sx={{
               backgroundColor: "white",
               border: "1px solid #e0e0e0",
+              width: 40,
+              height: 40,
               "&:hover": {
                 backgroundColor: "#f5f5f5",
               },
@@ -168,14 +215,16 @@ const TrendingCarousel = () => {
               },
             }}
           >
-            <ArrowBackIosIcon fontSize="medium" />
+            <ArrowBackIosIcon sx={{ fontSize: "1.25rem" }} />
           </IconButton>
           <IconButton
             onClick={handleNext}
-            disabled={currentIndex >= products.length - 4}
+            disabled={currentIndex >= products.length - (screenSize === 'mobile' ? 1 : screenSize === 'tablet' ? 2 : screenSize === 'desktop' ? 3 : 4)}
             sx={{
               backgroundColor: "white",
               border: "1px solid #e0e0e0",
+              width: 40,
+              height: 40,
               "&:hover": {
                 backgroundColor: "#f5f5f5",
               },
@@ -185,7 +234,7 @@ const TrendingCarousel = () => {
               },
             }}
           >
-            <ArrowForwardIosIcon fontSize="medium" />
+            <ArrowForwardIosIcon sx={{ fontSize: "1.25rem" }} />
           </IconButton>
         </Box>
       </Box>
@@ -222,6 +271,8 @@ const TrendingCarousel = () => {
               },
             }}
             onClick={() => handleProductClick(product.id)}
+            onTouchStart={() => handleTouchStart(product.id)}
+            onTouchEnd={handleTouchEnd}
           >
             {/* Product Image */}
             <Box
@@ -260,8 +311,8 @@ const TrendingCarousel = () => {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: 2,
-                  opacity: 0,
+                  gap: { xs: 0.5, sm: 2 },
+                  opacity: hoveredProduct === product.id ? 1 : 0, // Show on mobile touch
                   transition: "opacity 0.3s ease",
                   "&:hover": {
                     opacity: 1,
@@ -272,6 +323,8 @@ const TrendingCarousel = () => {
                   sx={{
                     backgroundColor: "white",
                     color: "#000",
+                    width: { xs: "28px", sm: "40px" },
+                    height: { xs: "28px", sm: "40px" },
                     "&:hover": {
                       backgroundColor: "#f0f0f0",
                     },
@@ -287,6 +340,8 @@ const TrendingCarousel = () => {
                   sx={{
                     backgroundColor: "white",
                     color: "#000",
+                    width: { xs: "28px", sm: "40px" },
+                    height: { xs: "28px", sm: "40px" },
                     "&:hover": {
                       backgroundColor: "#f0f0f0",
                     },
@@ -302,6 +357,8 @@ const TrendingCarousel = () => {
                   sx={{
                     backgroundColor: "white",
                     color: "#000",
+                    width: { xs: "28px", sm: "40px" },
+                    height: { xs: "28px", sm: "40px" },
                     "&:hover": {
                       backgroundColor: "#f0f0f0",
                     },
@@ -319,6 +376,60 @@ const TrendingCarousel = () => {
             {/* Product Details - Removed to show only images */}
           </Card>
         ))}
+      </Box>
+
+      {/* Mobile Navigation Buttons - Bottom */}
+      <Box sx={{ 
+        display: { xs: "flex", sm: "none" }, 
+        justifyContent: "center", 
+        gap: 2, 
+        mt: 3,
+        px: { xs: 1, sm: 2, md: 4 }
+      }}>
+        <IconButton
+          onClick={handlePrevious}
+          disabled={currentIndex === 0}
+          sx={{
+            backgroundColor: "#FFD700",
+            border: "1px solid #e0e0e0",
+            color: "#333",
+            width: 56,
+            height: 56,
+            "&:hover": {
+              backgroundColor: "#E6C200",
+              transform: "scale(1.1)",
+            },
+            "&:disabled": {
+              backgroundColor: "#f5f5f5",
+              color: "#ccc",
+              transform: "none",
+            },
+          }}
+        >
+          <ArrowBackIosIcon sx={{ fontSize: "1.5rem" }} />
+        </IconButton>
+        <IconButton
+          onClick={handleNext}
+          disabled={currentIndex >= products.length - 1}
+          sx={{
+            backgroundColor: "#FFD700",
+            border: "1px solid #e0e0e0",
+            color: "#333",
+            width: 56,
+            height: 56,
+            "&:hover": {
+              backgroundColor: "#E6C200",
+              transform: "scale(1.1)",
+            },
+            "&:disabled": {
+              backgroundColor: "#f5f5f5",
+              color: "#ccc",
+              transform: "none",
+            },
+          }}
+        >
+          <ArrowForwardIosIcon sx={{ fontSize: "1.5rem" }} />
+        </IconButton>
       </Box>
     
     </Box>

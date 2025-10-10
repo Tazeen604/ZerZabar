@@ -4,16 +4,16 @@ import {
   Typography,
   Card,
   CardContent,
-  IconButton,
   Button,
   Chip,
+  Grid,
+  CircularProgress,
+  IconButton,
 } from "@mui/material";
 import {
-  ArrowBackIos as ArrowBackIosIcon,
-  ArrowForwardIos as ArrowForwardIosIcon,
-  Favorite as FavoriteIcon,
   ShoppingCart as ShoppingCartIcon,
   Visibility as VisibilityIcon,
+  Favorite as FavoriteIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
@@ -26,18 +26,24 @@ const TodaysDropsCarousel = () => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedPriceFilter, setSelectedPriceFilter] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(40); // Start with 40 products
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hoveredProduct, setHoveredProduct] = useState(null);
 
   // Fetch products
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await api.getCarouselProducts();
+        // Fetch all products at once to enable client-side pagination
+        const response = await api.get('/products?per_page=1000'); // Get all products
         if (response.success) {
-          setProducts(response.data);
-          setFilteredProducts(response.data);
+          // Handle paginated response - data.data contains the actual products array
+          const productsData = response.data.data || response.data;
+          console.log('Fetched products:', productsData.length, 'products');
+          setProducts(productsData);
+          setFilteredProducts(productsData);
         }
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -68,25 +74,25 @@ const TodaysDropsCarousel = () => {
     }
     
     setFilteredProducts(filtered);
-    setCurrentIndex(0); // Reset to first page when filter changes
+    setVisibleCount(40); // Reset to initial 40 when filter changes
   }, [selectedPriceFilter, products]);
-
-  // Navigation handlers
-  const handlePrevious = () => {
-    setCurrentIndex((prev) => 
-      prev === 0 ? Math.max(0, (filteredProducts || []).length - 4) : prev - 1
-    );
-  };
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => 
-      prev >= (filteredProducts || []).length - 4 ? 0 : prev + 1
-    );
-  };
 
   // Handle price filter change
   const handlePriceFilter = (filter) => {
     setSelectedPriceFilter(filter);
+  };
+
+  // Handle "See More" button click
+  const handleSeeMore = async () => {
+    setLoadingMore(true);
+    // Simulate loading delay for better UX
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setVisibleCount(prev => {
+      const newCount = prev + 20;
+      console.log('Loading more products. Previous:', prev, 'New:', newCount);
+      return newCount;
+    });
+    setLoadingMore(false);
   };
 
   // Handle add to cart
@@ -110,6 +116,16 @@ const TodaysDropsCarousel = () => {
     navigate(`/product/${productId}`);
   };
 
+  // Handle mobile touch events
+  const handleTouchStart = (productId) => {
+    setHoveredProduct(productId);
+  };
+
+  const handleTouchEnd = () => {
+    // Delay to allow button clicks
+    setTimeout(() => setHoveredProduct(null), 150);
+  };
+
   // Calculate discount percentage
   const getDiscountPercentage = (originalPrice, salePrice) => {
     if (!salePrice || salePrice >= originalPrice) return 0;
@@ -119,12 +135,20 @@ const TodaysDropsCarousel = () => {
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-        <Typography>Loading today's drops...</Typography>
+        <CircularProgress size={60} sx={{ color: '#FFD700' }} />
       </Box>
     );
   }
 
-  const visibleProducts = (filteredProducts || []).slice(currentIndex, currentIndex + 4);
+  const visibleProducts = (filteredProducts || []).slice(0, visibleCount);
+  const hasMoreProducts = visibleCount < (filteredProducts || []).length;
+  
+  console.log('Current state:', {
+    totalProducts: (filteredProducts || []).length,
+    visibleCount,
+    visibleProducts: visibleProducts.length,
+    hasMoreProducts
+  });
 
   return (
     <Box
@@ -165,57 +189,21 @@ const TodaysDropsCarousel = () => {
             Today's Drops
           </Typography>
           
-          {/* Category Tab */}
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 500,
-              fontSize: { xs: "1rem", md: "1.1rem" },
-              color: "#000",
-              textDecoration: "underline",
-              textUnderlineOffset: "4px",
-              textDecorationThickness: "2px",
-              mb: 3,
-            }}
-          >
-            MEN
-          </Typography>
+          
         </Box>
 
-        {/* Navigation Arrows */}
-        <Box sx={{ display: "flex", gap: 1, alignSelf: { xs: "center", sm: "flex-end" } }}>
-          <IconButton
-            onClick={handlePrevious}
-            disabled={currentIndex === 0}
+        {/* Product Count */}
+        <Box sx={{ alignSelf: { xs: "center", sm: "flex-end" } }}>
+          <Typography
+            variant="body2"
             sx={{
-              backgroundColor: "transparent",
-              color: "#000",
-              "&:hover": {
-                backgroundColor: "#f5f5f5",
-              },
-              "&:disabled": {
-                color: "#ccc",
-              },
+              color: "#666",
+              fontSize: { xs: "0.8rem", sm: "0.9rem" },
+              fontWeight: 500,
             }}
           >
-            <ArrowBackIosIcon fontSize="medium" />
-          </IconButton>
-          <IconButton
-            onClick={handleNext}
-            disabled={currentIndex >= (filteredProducts || []).length - 4}
-            sx={{
-              backgroundColor: "transparent",
-              color: "#000",
-              "&:hover": {
-                backgroundColor: "#f5f5f5",
-              },
-              "&:disabled": {
-                color: "#ccc",
-              },
-            }}
-          >
-            <ArrowForwardIosIcon fontSize="medium" />
-          </IconButton>
+            Showing {visibleProducts.length} of {(filteredProducts || []).length} products
+          </Typography>
         </Box>
       </Box>
 
@@ -223,11 +211,16 @@ const TodaysDropsCarousel = () => {
       <Box
         sx={{
           display: "flex",
-          gap: { xs: 1, sm: 1.5 },
+          gap: { xs: 0.5, sm: 1.5 },
           mb: { xs: 3, md: 4 },
           px: { xs: 1, sm: 2, md: 4 },
-          flexWrap: "wrap",
-          justifyContent: { xs: "center", sm: "flex-start" },
+          flexWrap: "nowrap",
+          overflowX: { xs: "auto", sm: "visible" },
+          justifyContent: { xs: "flex-start", sm: "flex-start" },
+          "&::-webkit-scrollbar": {
+            display: "none",
+          },
+          scrollbarWidth: "none",
         }}
       >
         {[
@@ -244,12 +237,14 @@ const TodaysDropsCarousel = () => {
               color: "#000",
               border: "1px solid #e0e0e0",
               borderRadius: "4px",
-              px: { xs: 1.5, sm: 2 },
+              px: { xs: 1, sm: 2 },
               py: 0.5,
-              fontSize: { xs: "0.7rem", sm: "0.8rem" },
+              fontSize: { xs: "0.65rem", sm: "0.8rem" },
               fontWeight: 400,
               textTransform: "none",
-              minWidth: "auto",
+              minWidth: { xs: "fit-content", sm: "auto" },
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               height: { xs: "28px", sm: "32px" },
               "&:hover": {
                 backgroundColor: "#f5f5f5",
@@ -266,12 +261,12 @@ const TodaysDropsCarousel = () => {
         sx={{
           display: "grid",
           gridTemplateColumns: {
-            xs: "repeat(1, 1fr)",
+            xs: "repeat(2, 1fr)",
             sm: "repeat(2, 1fr)",
             md: "repeat(3, 1fr)",
             lg: "repeat(4, 1fr)",
           },
-          gap: { xs: 2, sm: 3 },
+          gap: { xs: 1.5, sm: 2, md: 3 },
           px: { xs: 1, sm: 2, md: 4 },
         }}
       >
@@ -297,6 +292,8 @@ const TodaysDropsCarousel = () => {
                 },
               }}
               onClick={() => handleProductClick(product?.id)}
+              onTouchStart={() => handleTouchStart(product?.id)}
+              onTouchEnd={handleTouchEnd}
             >
               {/* Product Image */}
               <Box
@@ -348,8 +345,8 @@ const TodaysDropsCarousel = () => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 2,
-                    opacity: 0,
+                    gap: { xs: 0.5, sm: 2 },
+                    opacity: hoveredProduct === product?.id ? 1 : 0, // Show on mobile touch
                     transition: "opacity 0.3s ease",
                     "&:hover": {
                       opacity: 1,
@@ -360,6 +357,8 @@ const TodaysDropsCarousel = () => {
                     sx={{
                       backgroundColor: "white",
                       color: "#000",
+                      width: { xs: "28px", sm: "40px" },
+                      height: { xs: "28px", sm: "40px" },
                       "&:hover": {
                         backgroundColor: "#f0f0f0",
                       },
@@ -375,6 +374,8 @@ const TodaysDropsCarousel = () => {
                     sx={{
                       backgroundColor: "white",
                       color: "#000",
+                      width: { xs: "28px", sm: "40px" },
+                      height: { xs: "28px", sm: "40px" },
                       "&:hover": {
                         backgroundColor: "#f0f0f0",
                       },
@@ -390,6 +391,8 @@ const TodaysDropsCarousel = () => {
                     sx={{
                       backgroundColor: "white",
                       color: "#000",
+                      width: { xs: "28px", sm: "40px" },
+                      height: { xs: "28px", sm: "40px" },
                       "&:hover": {
                         backgroundColor: "#f0f0f0",
                       },
@@ -406,18 +409,7 @@ const TodaysDropsCarousel = () => {
 
               {/* Product Details */}
               <CardContent sx={{ p: 2 }}>
-                {/* Brand Name */}
-                <Typography
-                  variant="body1"
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.9rem",
-                    color: "#000",
-                    mb: 0.5,
-                  }}
-                >
-                  {product.brand || "Zer Zabar"}
-                </Typography>
+
 
                 {/* Product Name */}
                 <Typography
@@ -434,27 +426,12 @@ const TodaysDropsCarousel = () => {
                 
                 {/* Pricing */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 700,
-                      color: "#000",
-                      fontSize: "1rem",
-                    }}
-                  >
-                    ₨{product?.sale_price || product?.price || 0}
+                  <Typography sx={{ fontWeight: 700, color: "#000" }}>
+                    ₨{Math.round(product?.sale_price || product?.price || 0)}
                   </Typography>
-                  
                   {product?.sale_price && product?.sale_price < product?.price && (
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        textDecoration: "line-through",
-                        color: "#999",
-                        fontSize: "0.8rem",
-                      }}
-                    >
-                      ₨{product?.price || 0}
+                    <Typography sx={{ textDecoration: "line-through", color: "#888", fontSize: "0.85rem" }}>
+                      ₨{Math.round(product?.price || 0)}
                     </Typography>
                   )}
                 </Box>
@@ -463,6 +440,99 @@ const TodaysDropsCarousel = () => {
           );
         })}
       </Box>
+
+      {/* See More Button */}
+      {hasMoreProducts && (
+        <Box sx={{
+          display: "flex",
+          justifyContent: "center",
+          mt: { xs: 4, md: 6 },
+          px: { xs: 1, sm: 2, md: 4 }
+        }}>
+          <Button
+            onClick={handleSeeMore}
+            disabled={loadingMore}
+            variant="contained"
+            sx={{
+              backgroundColor: "#FFD700",
+              color: "#2C2C2C",
+              fontWeight: "bold",
+              fontSize: { xs: "0.9rem", sm: "1rem" },
+              px: { xs: 4, sm: 6 },
+              py: { xs: 1.2, sm: 1.5 },
+              borderRadius: { xs: "12px", sm: "8px" },
+              textTransform: "none",
+              minWidth: { xs: "160px", sm: "200px" },
+              height: { xs: "44px", sm: "48px" },
+              boxShadow: "0 4px 12px rgba(255, 215, 0, 0.3)",
+              "&:hover": {
+                backgroundColor: "#FFC107",
+                transform: "translateY(-2px)",
+                boxShadow: "0 6px 16px rgba(255, 215, 0, 0.4)",
+              },
+              "&:disabled": {
+                backgroundColor: "#f5f5f5",
+                color: "#999",
+                transform: "none",
+                boxShadow: "none",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
+            {loadingMore ? (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <CircularProgress size={20} sx={{ color: "#2C2C2C" }} />
+                <Typography sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}>
+                  Loading...
+                </Typography>
+              </Box>
+            ) : (
+              `See More ${(filteredProducts || []).length - visibleCount}/${(filteredProducts || []).length} products`
+            )}
+          </Button>
+        </Box>
+      )}
+
+      {/* No More Products Message */}
+      {!hasMoreProducts && (filteredProducts || []).length > 0 && (
+        <Box sx={{
+          display: "flex",
+          justifyContent: "center",
+          mt: { xs: 4, md: 6 },
+          px: { xs: 1, sm: 2, md: 4 }
+        }}>
+          <Box sx={{
+            backgroundColor: "#f8f9fa",
+            borderRadius: { xs: "12px", sm: "8px" },
+            px: { xs: 3, sm: 4 },
+            py: { xs: 2, sm: 2.5 },
+            textAlign: "center",
+            border: "1px solid #e9ecef",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          }}>
+            <Typography 
+              variant="h6" 
+              sx={{
+                color: "#6c757d",
+                fontWeight: 500,
+                fontSize: { xs: "0.9rem", sm: "1rem" },
+                mb: 0.5,
+              }}
+            >
+              No more products to view
+            </Typography>
+            <Typography 
+              variant="body2" 
+              sx={{
+                color: "#adb5bd",
+                fontSize: { xs: "0.75rem", sm: "0.85rem" },
+              }}
+            >
+              You've seen all {visibleProducts.length} products
+            </Typography>
+          </Box>
+        </Box>
+      )}
 
       {/* Show message if no products match filter */}
       {(filteredProducts || []).length === 0 && (

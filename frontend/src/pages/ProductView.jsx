@@ -49,8 +49,10 @@ const ProductView = () => {
   // Set total height for image sliding
   useEffect(() => {
     if (product?.images?.length) {
-      // Container must be tall enough for all images
-      const totalHeightValue = (product.images.length-1) * window.innerHeight;
+      // ✅ FIX: only scroll through (n - 1) full screens, plus the height of the last image
+      const viewportHeight = window.innerHeight;
+      const totalImages = product.images.length;
+      const totalHeightValue = (totalImages - 1) * viewportHeight + viewportHeight / totalImages;
       setTotalHeight(totalHeightValue);
       setCurrentIndex(0); // Reset to first image when product changes
       

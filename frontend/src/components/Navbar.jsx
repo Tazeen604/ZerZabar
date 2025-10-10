@@ -96,6 +96,13 @@ const Navbar = () => {
     setHoverTimeout(timeout);
   };
 
+  const handleMegaMenuLeave = () => {
+    const timeout = setTimeout(() => {
+      setShopMenuAnchor(null);
+    }, 200);
+    setHoverTimeout(timeout);
+  };
+
   const handleCategoryClick = (categoryId, categoryName) => {
     navigate(`/shop?category=${categoryId}`);
     setShopMenuAnchor(null);
@@ -123,7 +130,7 @@ const Navbar = () => {
         left: "50%",
         transform: "translateX(-50%)",
         top: isHomePage ? "80px" : "16px", // Position below logo on home, reduced margin on other pages
-        display: "flex",
+        display: { xs: "none", md: "flex" }, // Hide navbar completely on mobile
         justifyContent: "center",
         alignItems: "center",
         width: { xs: "90%", md: "60%" }, // narrower on mobile
@@ -138,7 +145,7 @@ const Navbar = () => {
         sx={{
           position: "relative",
           display: "flex",
-          justifyContent: { xs: "flex-end", md: "space-between" },
+          justifyContent: { xs: "space-between", md: "space-between" },
           alignItems: "center",
           px: { xs: 2, md: 6 },
           width: "100%",
@@ -148,6 +155,13 @@ const Navbar = () => {
         {!isHomePage && (
           <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center" ,ml:4}}>
             <Logo size="medium" position="static" />
+          </Box>
+        )}
+
+        {/* Mobile Logo for home page */}
+        {isHomePage && (
+          <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center" }}>
+            <Logo size="small" position="static" />
           </Box>
         )}
 
@@ -191,6 +205,9 @@ const Navbar = () => {
                     open={Boolean(shopMenuAnchor)}
                     onClose={() => setShopMenuAnchor(null)}
                     TransitionComponent={Fade}
+                    MenuListProps={{
+                      onMouseLeave: handleMegaMenuLeave,
+                    }}
                     transformOrigin={{
                       vertical: 'top',
                       horizontal: 'left',
@@ -383,33 +400,41 @@ const Navbar = () => {
           ))}
         </Box>
 
-          {/* Cart - Right Corner */}
-          <Box sx={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: 1,
-            ml: "auto", // Push to the right within navbar flow
-            mr: { xs: 1, md: 2 }, // Margin from right edge
-          }}>
-          {/* Hamburger Menu (only xs) - Show first on mobile */}
+        {/* Mobile Navigation - Right Corner */}
+        <Box sx={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: { xs: 1, md: 2 },
+          ml: "auto", // Push to the right within navbar flow
+        }}>
+          {/* Hamburger Menu (only on mobile) */}
           <IconButton
             sx={{ 
-              display: { xs: "block", md: "none" }, 
+              display: { xs: "flex", md: "none" }, 
               color: "white",
-              order: { xs: 1, md: 2 }
+              "&:hover": { 
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+                color: "#FFD54F"
+              },
+              transition: "all 0.3s ease",
             }}
             onClick={() => setDrawerOpen(true)}
           >
             <MenuIcon />
           </IconButton>
 
+          {/* Cart Button */}
           <IconButton
             onClick={() => navigate("/cart")}
             sx={{
               backgroundColor: "#FFD700",
               color: "#000",
-              "&:hover": { backgroundColor: "#e6ac00" },
-              order: { xs: 2, md: 1 } // Cart button comes after hamburger on mobile
+              mr: 1, // add right margin away from edge
+              "&:hover": { 
+                backgroundColor: "#e6ac00",
+                transform: "scale(1.05)"
+              },
+              transition: "all 0.3s ease",
             }}
           >
             <Badge badgeContent={getTotalItems()} color="error">
@@ -630,6 +655,74 @@ const Navbar = () => {
         </Box>
       </Drawer>
     </AppBar>
+
+    {/* Mobile Navigation - Only hamburger and cart */}
+    <Box sx={{
+      display: { xs: "flex", md: "none" },
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 1300,
+      backgroundColor: "transparent",
+      padding: 2,
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}>
+      {/* Mobile Logo for home page */}
+      {isHomePage && (
+        <Box sx={{ 
+          display: "flex", 
+          alignItems: "center",
+          ml: 2,
+        }}>
+          <Logo size="small" position="static" />
+        </Box>
+      )}
+
+      {/* Mobile Navigation Buttons */}
+      <Box sx={{ 
+        display: "flex", 
+        alignItems: "center", 
+        gap: 1,
+      }}>
+        {/* Hamburger Menu */}
+        <IconButton
+          sx={{ 
+            color: "white",
+            backgroundColor: "rgba(0,0,0,0.3)",
+            backdropFilter: "blur(10px)",
+            "&:hover": { 
+              backgroundColor: "rgba(0,0,0,0.5)",
+              color: "#FFD54F"
+            },
+            transition: "all 0.3s ease",
+          }}
+          onClick={() => setDrawerOpen(true)}
+        >
+          <MenuIcon />
+        </IconButton>
+
+        {/* Cart Button */}
+        <IconButton
+          onClick={() => navigate("/cart")}
+          sx={{
+            backgroundColor: "#FFD700",
+            color: "#000",
+            mr: 1, // add right margin away from edge
+            "&:hover": { 
+              backgroundColor: "#e6ac00",
+              transform: "scale(1.05)"
+            },
+            transition: "all 0.3s ease",
+          }}
+        >
+          <Badge badgeContent={getTotalItems()} color="error">
+            <ShoppingCartIcon />
+          </Badge>
+        </IconButton>
+      </Box>
+    </Box>
     </Box>
   );
 };

@@ -200,7 +200,7 @@ const Settings = () => {
       <Grid container spacing={3}>
         {settingsCategories.map((category, index) => (
           <Grid item xs={12} md={6} key={index}>
-            <Card sx={{ height: '100%' }}>
+            <Card sx={{ height: '100%'  }}>
               <CardHeader
                 avatar={
                   <Box

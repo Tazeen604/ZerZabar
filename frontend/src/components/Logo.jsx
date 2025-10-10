@@ -51,7 +51,7 @@ const Logo = ({ size = 'medium', position = 'fixed' }) => {
     >
       {/* Logo Image - No Background Container */}
       <img
-        src="/images/logo.jpg"
+        src="/images/logo.png"
         alt="Zer Zabar Logo"
         style={{
           height: 'auto',

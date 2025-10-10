@@ -34,7 +34,7 @@ function App() {
   return (
     <CartProvider>
       <Router>
-        <Box sx={{ width: "100%", overflowX: "hidden", minHeight: "100vh" }}>
+        <Box sx={{ width: "100%", overflowX: "hidden", minHeight: "100vh", backgroundColor: "rgba(0, 0, 0, 0.8)" }}>
           <Routes>
             {/* Admin Panel Routes */}
             <Route path="/admin" element={<AdminApp />} />

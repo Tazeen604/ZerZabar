@@ -52,7 +52,6 @@ const Sidebar = ({ open, onToggle }) => {
       hasSubmenu: true,
       subItems: [
         { text: 'Product Management', path: '/admin/product-management' },
-        { text: 'Add Category', path: '/admin/add-category' },
         { text: 'Category Management', path: '/admin/category-management' },
       ],
     },

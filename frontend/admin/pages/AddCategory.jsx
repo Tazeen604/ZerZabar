@@ -138,25 +138,7 @@ const AddCategory = () => {
         {/* Right Column */}
         <Grid item xs={12} md={4}>
 
-          {/* Category Status */}
-          <Card sx={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
-                Category Status
-              </Typography>
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={categoryForm.is_active}
-                    onChange={(e) => handleInputChange('is_active', e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label="Active Category"
-              />
-            </CardContent>
-          </Card>
+      
         </Grid>
       </Grid>
 

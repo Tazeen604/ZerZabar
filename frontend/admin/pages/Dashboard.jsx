@@ -253,32 +253,6 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
-      {/* Alert Banner */}
-      <Box
-        sx={{
-          backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#FFF3E0',
-          border: `1px solid ${theme.palette.warning.main}`,
-          borderRadius: '8px',
-          p: 2,
-          mb: 4,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-        }}
-      >
-        <Avatar sx={{ backgroundColor: theme.palette.warning.main }}>
-          <Assessment />
-        </Avatar>
-        <Box>
-          <Typography variant="body1" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
-            System Notice
-          </Typography>
-          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-            We regret to inform you that our server is currently experiencing technical difficulties.
-          </Typography>
-        </Box>
-      </Box>
-
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {statsData.map((stat, index) => (

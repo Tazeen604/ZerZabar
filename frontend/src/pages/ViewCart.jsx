@@ -320,34 +320,9 @@ const ViewCart = () => {
             <Paper sx={{ p: 3, backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
               {/* Promo Code */}
               <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1, fontSize: "0.8125rem", textTransform: "uppercase" }}>
-                  Enter PROMO CODE
-                </Typography>
+                
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <TextField
-                    placeholder="Promo Code"
-                    size="small"
-                    sx={{
-                      flex: 1,
-                      "& .MuiInputBase-input": {
-                        fontSize: "0.8125rem",
-                        padding: "8px"
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="contained"
-                    size="small"
-                    sx={{
-                      backgroundColor: "#000",
-                      color: "#fff",
-                      fontSize: "0.8125rem",
-                      px: 2,
-                      textTransform: "none"
-                    }}
-                  >
-                    Submit
-                  </Button>
+                 
                 </Box>
                 </Box>
 
@@ -425,6 +400,7 @@ const ViewCart = () => {
                     sx={{
                   borderColor: "#ddd",
                   color: "#000",
+                  
                   py: 1,
                   fontSize: "0.8125rem",
                   textTransform: "none",

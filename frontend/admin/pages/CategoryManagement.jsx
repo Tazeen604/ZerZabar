@@ -271,7 +271,7 @@ const CategoryManagement = () => {
           </TableHead>
           <TableBody>
             {categories && categories.length > 0 ? (
-              categories.map((category) => (
+          categories.map((category) => (
               <React.Fragment key={category.id}>
                 <TableRow>
                   <TableCell>
@@ -284,7 +284,7 @@ const CategoryManagement = () => {
                         {expandedCategories[category.id] ? <ExpandLess /> : <ExpandMore />}
                       </IconButton>
                       {category.name}
-                    </Box>
+                  </Box>
                   </TableCell>
                   <TableCell>{category.description}</TableCell>
                   <TableCell>{category.products_count || 0}</TableCell>
@@ -328,8 +328,8 @@ const CategoryManagement = () => {
                             onClick={() => handleOpenDialog('subcategory', sub)}
                           />
                         ))}
-                        <Button
-                          size="small"
+                  <Button
+                    size="small"
                           startIcon={<Add />}
                           onClick={() => {
                             setSubcategoryForm(prev => ({ ...prev, category_id: category.id }));
@@ -337,7 +337,7 @@ const CategoryManagement = () => {
                           }}
                         >
                           Add Subcategory
-                        </Button>
+                  </Button>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -366,7 +366,7 @@ const CategoryManagement = () => {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h5">Subcategories</Typography>
-        <Button
+                  <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => handleOpenDialog('subcategory')}
@@ -498,21 +498,21 @@ const CategoryManagement = () => {
             {dialogType === 'category' ? (
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Category Name"
-                    value={categoryForm.name}
+            <TextField
+              fullWidth
+              label="Category Name"
+              value={categoryForm.name}
                     onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                    required
-                  />
+              required
+            />
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Description"
-                    multiline
-                    rows={3}
-                    value={categoryForm.description}
+            <TextField
+              fullWidth
+              label="Description"
+              multiline
+              rows={3}
+              value={categoryForm.description}
                     onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                   />
                 </Grid>
