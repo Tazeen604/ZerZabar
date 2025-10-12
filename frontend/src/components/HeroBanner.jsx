@@ -1,9 +1,16 @@
 import React from "react";
 import { Box, Button, Typography } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import menswearVideo from "../assets/hero_banner.mp4";
 import Logo from "./Logo";
 
 const HeroBanner = () => {
+  const navigate = useNavigate();
+
+  const handleShopNowClick = () => {
+    navigate('/shop');
+  };
+
   return (
     <Box
        sx={{
@@ -94,6 +101,7 @@ const HeroBanner = () => {
             variant="contained"
             color="warning"
             size="large"
+            onClick={handleShopNowClick}
             sx={{
               backgroundColor: "#FFD700",
             color: "#333",

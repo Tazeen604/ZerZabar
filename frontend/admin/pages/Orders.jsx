@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -30,6 +31,7 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Grid,
 } from '@mui/material';
 import {
   Search,
@@ -49,6 +51,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton';
 import EmptyState from '../components/EmptyState';
 
 const Orders = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -125,7 +128,7 @@ const Orders = () => {
   };
 
   const handleViewOrder = () => {
-    setViewDialogOpen(true);
+    navigate(`/admin/orders/${selectedOrder.id}`);
     handleMenuClose();
   };
 
@@ -300,20 +303,30 @@ const Orders = () => {
       </Box>
 
       {/* Orders Table */}
-      <TableContainer component={Paper} sx={{ borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-        <Table>
+      <TableContainer 
+        component={Paper} 
+        sx={{ 
+          borderRadius: '12px', 
+          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+          overflowX: 'auto',
+          maxWidth: '100%'
+        }}
+      >
+        <Table sx={{ tableLayout: 'fixed', minWidth: '1400px' }}>
           <TableHead sx={{ backgroundColor: '#F8F9FA' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Order ID</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Date</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Product</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Customer Name</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Email ID</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Phone No.</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Address</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Payment Type</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212121' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '120px' }}>Order ID</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '100px' }}>Date</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '200px' }}>Product</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '150px' }}>Customer Name</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '180px' }}>Email ID</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '120px' }}>Phone No.</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '200px' }}>Address</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '120px' }}>City</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '120px' }}>District</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '120px' }}>Payment Type</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '120px' }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212121', width: '80px' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -331,41 +344,144 @@ const Orders = () => {
                   }}
                 >
                   <TableCell sx={{ fontWeight: 'bold', color: '#FFD700' }}>
-                    #{order.order_number || order.id}
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '100px'
+                      }}
+                    >
+                      #{order.order_number || order.id}
+                    </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ color: '#757575' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: '#757575',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
                       {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontSize: '1.2rem' }}>🛍️</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {order.items?.length || 0} items
-                      </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      {order.items && order.items.length > 0 ? (
+                        order.items.slice(0, 2).map((item, index) => (
+                          <Typography 
+                            key={index} 
+                            variant="body2" 
+                            sx={{ 
+                              fontWeight: 'bold', 
+                              fontSize: '0.875rem',
+                              wordWrap: 'break-word',
+                              whiteSpace: 'normal',
+                              lineHeight: 1.2
+                            }}
+                          >
+                            {item.product_name || item.product?.name || 'Unknown Product'}
+                            {item.quantity > 1 && ` (x${item.quantity})`}
+                          </Typography>
+                        ))
+                      ) : (
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          No items
+                        </Typography>
+                      )}
+                      {order.items && order.items.length > 2 && (
+                        <Typography variant="caption" sx={{ color: '#757575' }}>
+                          +{order.items.length - 2} more items
+                        </Typography>
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        wordWrap: 'break-word',
+                        whiteSpace: 'normal',
+                        lineHeight: 1.2
+                      }}
+                    >
                       {order.customer_name || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ color: '#757575' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: '#757575',
+                        wordWrap: 'break-word',
+                        whiteSpace: 'normal',
+                        lineHeight: 1.2
+                      }}
+                    >
                       {order.customer_email || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ color: '#757575' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: '#757575',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
                       {order.customer_phone || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ color: '#757575' }}>
-                      {typeof order.shipping_address === 'string' 
-                        ? order.shipping_address.substring(0, 30) + '...' 
-                        : 'N/A'}
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: '#757575',
+                        wordWrap: 'break-word',
+                        whiteSpace: 'normal',
+                        lineHeight: 1.2,
+                        maxHeight: '60px',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical'
+                      }}
+                    >
+                      {order.shipping_address || 'N/A'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: '#757575',
+                        wordWrap: 'break-word',
+                        whiteSpace: 'normal',
+                        lineHeight: 1.2
+                      }}
+                    >
+                      {order.city || 'N/A'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: '#757575',
+                        wordWrap: 'break-word',
+                        whiteSpace: 'normal',
+                        lineHeight: 1.2
+                      }}
+                    >
+                      {order.district || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -376,6 +492,12 @@ const Orders = () => {
                         backgroundColor: '#E3F2FD',
                         color: '#2196F3',
                         fontWeight: 'bold',
+                        maxWidth: '100%',
+                        '& .MuiChip-label': {
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }
                       }}
                     />
                   </TableCell>
@@ -388,6 +510,12 @@ const Orders = () => {
                         backgroundColor: getStatusColor(order.status) + '20',
                         color: getStatusColor(order.status),
                         fontWeight: 'bold',
+                        maxWidth: '100%',
+                        '& .MuiChip-label': {
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }
                       }}
                     />
                   </TableCell>
@@ -408,7 +536,7 @@ const Orders = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={10} sx={{ textAlign: 'center', py: 4 }}>
+                <TableCell colSpan={12} sx={{ textAlign: 'center', py: 4 }}>
                   <EmptyState
                     icon={<ShoppingCart />}
                     title="No Orders Found"
@@ -464,19 +592,7 @@ const Orders = () => {
           </ListItemIcon>
           <ListItemText>View Details</ListItemText>
         </MenuItem>
-        <MenuItem
-          onClick={handleEditOrder}
-          sx={{
-            '&:hover': {
-              backgroundColor: 'rgba(255, 152, 0, 0.1)',
-            },
-          }}
-        >
-          <ListItemIcon>
-            <Edit sx={{ color: '#FF9800' }} />
-          </ListItemIcon>
-          <ListItemText>Edit Order</ListItemText>
-        </MenuItem>
+       
         <MenuItem
           onClick={() => handleUpdateStatus('Completed')}
           sx={{
@@ -541,6 +657,12 @@ const Orders = () => {
                     <Typography variant="body2">
                       <strong>Address:</strong> {selectedOrder.shipping_address || 'N/A'}
                     </Typography>
+                    <Typography variant="body2">
+                      <strong>City:</strong> {selectedOrder.city || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>District:</strong> {selectedOrder.district || 'N/A'}
+                    </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -557,6 +679,21 @@ const Orders = () => {
                     <Typography variant="body2">
                       <strong>Items:</strong> {selectedOrder.items?.length || 0} items
                     </Typography>
+                    {selectedOrder.items && selectedOrder.items.length > 0 && (
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                          Products:
+                        </Typography>
+                        {selectedOrder.items.map((item, index) => (
+                          <Typography key={index} variant="body2" sx={{ ml: 2, mb: 0.5 }}>
+                            • {item.product_name || item.product?.name || 'Unknown Product'}
+                            {item.quantity > 1 && ` (Qty: ${item.quantity})`}
+                            {item.size && ` - Size: ${item.size}`}
+                            {item.color && ` - Color: ${item.color}`}
+                          </Typography>
+                        ))}
+                      </Box>
+                    )}
                     <Typography variant="body2">
                       <strong>Status:</strong> {selectedOrder.status || 'Unknown'}
                     </Typography>

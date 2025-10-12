@@ -18,6 +18,7 @@ import {
   Chip,
   Pagination,
 } from "@mui/material";
+import Breadcrumbs from "../components/Breadcrumbs";
 import { Search, FilterList, ShoppingCart, Visibility } from "@mui/icons-material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
@@ -26,15 +27,23 @@ import PageContainer from "../components/PageContainer";
 import Footer from "../components/Footer";
 import { getProductImageUrl } from "../utils/imageUtils";
 import FilterMegaPanel from "../components/FilterMegaPanel";
+import ProductCard from "../components/ProductCard";
+import CartDrawer from "../components/CartDrawer";
 
 const Shop = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  const [selectedCollection, setSelectedCollection] = useState("");
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,6 +55,10 @@ const Shop = () => {
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [selectedColors, setSelectedColors] = useState([]);
   const [selectedCollections, setSelectedCollections] = useState([]);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(12);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -55,8 +68,10 @@ const Shop = () => {
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
     const subcategoryFromUrl = searchParams.get('subcategory');
+    const collectionFromUrl = searchParams.get('collection');
     console.log('URL category parameter:', categoryFromUrl);
     console.log('URL subcategory parameter:', subcategoryFromUrl);
+    console.log('URL collection parameter:', collectionFromUrl);
     
     if (categoryFromUrl) {
       setSelectedCategory(categoryFromUrl);
@@ -73,6 +88,14 @@ const Shop = () => {
       setSelectedSubcategory("");
       console.log('No subcategory in URL, clearing selectedSubcategory');
     }
+
+    if (collectionFromUrl) {
+      setSelectedCollection(collectionFromUrl);
+      console.log('Set selectedCollection to:', collectionFromUrl);
+    } else {
+      setSelectedCollection("");
+      console.log('No collection in URL, clearing selectedCollection');
+    }
   }, [searchParams]);
 
   // Fetch categories on mount
@@ -88,7 +111,7 @@ const Shop = () => {
     }, 100); // Small delay to ensure state is properly set
     
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, selectedCategory, selectedSubcategory, sortBy, sortOrder, currentPage]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, selectedCollection, sortBy, sortOrder, currentPage]);
 
 const fetchProducts = async () => {
   try {
@@ -101,7 +124,7 @@ const fetchProducts = async () => {
       sort_by: sortBy,
       sort_order: sortOrder,
       page: currentPage,
-      per_page: 12,
+      per_page: 1000, // Load all products at once
     };
     
     // Only include category_id if selectedCategory is not empty
@@ -112,6 +135,11 @@ const fetchProducts = async () => {
     // Only include subcategory_id if selectedSubcategory is not empty
     if (selectedSubcategory && selectedSubcategory !== "") {
       rawParams.subcategory_id = selectedSubcategory;
+    }
+
+    // Only include collection if selectedCollection is not empty
+    if (selectedCollection && selectedCollection !== "") {
+      rawParams.collection = selectedCollection;
     }
 
     // Filter out empty values
@@ -132,8 +160,10 @@ const fetchProducts = async () => {
     console.log('params after filtering:', params);
     console.log('Will include category_id?', selectedCategory && selectedCategory !== "");
     console.log('Will include subcategory_id?', selectedSubcategory && selectedSubcategory !== "");
+    console.log('Categories available:', categories);
     const response = await apiService.getProducts(params);
     console.log('API Response:', response);
+    console.log('Products received:', response.data?.data?.length || response.data?.length || 0);
     console.log('=== END DEBUG ===');
     
     // Mark initial load as complete
@@ -185,7 +215,9 @@ const fetchCategories = async () => {
   };
 
   const handleCategoryChange = (event) => {
-    setSelectedCategory(event.target.value);
+    const categoryId = event.target.value;
+    console.log('Category changed to:', categoryId, 'type:', typeof categoryId);
+    setSelectedCategory(categoryId);
     setCurrentPage(1);
   };
 
@@ -214,23 +246,20 @@ const fetchCategories = async () => {
     navigate(`/product/${productId}`);
   };
 
-  const handleAddToCart = (product, event) => {
-    event.stopPropagation();
-    
-    const cartItem = {
-      id: product.id,
-      name: product.name,
-      price: parseFloat(product.sale_price || product.price || 0),
-      originalPrice: product.sale_price ? parseFloat(product.price || 0) : null,
-      image: product.images?.[0]?.image_path,
-      size: 'M', // Default size for shop
-      color: '', // Default color for shop
-      quantity: 1,
-    };
-    
-    addToCart(cartItem);
+  const handleAddToCart = (product, cartItem) => {
+    // Cart item is already added in ProductCard, just show success message
     setSnackbarMessage(`${product.name} added to cart!`);
     setSnackbarOpen(true);
+  };
+
+  const handleQuickAddToCart = (product) => {
+    setSelectedProduct(product);
+    setCartDrawerOpen(true);
+  };
+
+  const handleCartDrawerClose = () => {
+    setCartDrawerOpen(false);
+    setSelectedProduct(null);
   };
 
   const handlePageChange = (event, page) => {
@@ -247,6 +276,19 @@ const fetchCategories = async () => {
   const derivedColors = Array.from(new Set(products.flatMap(p => Array.isArray(p.colors)? p.colors: []))).map(c => ({ value: c, label: c }));
 
   const applyPanel = () => { setPanelOpen(false); setCurrentPage(1); };
+
+  // Handle "See More" button click
+  const handleSeeMore = async () => {
+    setLoadingMore(true);
+    // Simulate loading delay for better UX
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setVisibleCount(prev => {
+      const newCount = prev + 12;
+      console.log('Loading more products. Previous:', prev, 'New:', newCount);
+      return newCount;
+    });
+    setLoadingMore(false);
+  };
 
   const filteredProducts = useMemo(() => {
     let list = products || [];
@@ -280,8 +322,10 @@ const fetchCategories = async () => {
       backgroundColor: '#fff', 
       minHeight: '100vh', 
       pt: 12,
-      width: '100%'
+      width: '100%',
+      overflow: 'visible'
     }}>
+      <Breadcrumbs />
       <Container 
         maxWidth="xl"
         sx={{ 
@@ -311,38 +355,146 @@ const fetchCategories = async () => {
         {/* Mobile layout */}
         <Box sx={{ display: { xs: 'block', md: 'none' } }}>
           <TextField
-              placeholder="Search..."
+            placeholder="Search products..."
             value={searchTerm}
             onChange={handleSearch}
-              size="small"
+            size="small"
             fullWidth
-            sx={{ mb: 1.5, '& .MuiOutlinedInput-root': { fontSize: '0.85rem', borderRadius: 0 } }}
-            InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: '#666', fontSize: '18px' }} /> }}
+            sx={{ 
+              mb: 2, 
+              '& .MuiOutlinedInput-root': { 
+                fontSize: '0.85rem', 
+                borderRadius: 1,
+                backgroundColor: '#f9f9f9'
+              } 
+            }}
+            InputProps={{ 
+              startAdornment: <Search sx={{ mr: 1, color: '#666', fontSize: '18px' }} /> 
+            }}
           />
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <FormControl size="small" sx={{ flex: 1 }}>
-              <InputLabel shrink={true}>Category</InputLabel>
-              <Select value={selectedCategory} onChange={handleCategoryChange} label="Category" displayEmpty>
-                <MenuItem value="">All Products</MenuItem>
-                {categories.map((category) => (<MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>))}
+          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+            <FormControl size="small" sx={{ flex: 1, minWidth: '120px' }}  variant="standard">
+              <InputLabel shrink={true} sx={{ fontSize: '0.8rem' }}>Category</InputLabel>
+              <Select 
+                value={selectedCategory} 
+                onChange={handleCategoryChange} 
+                label="Category" 
+                displayEmpty
+                sx={{ fontSize: '0.85rem' }}
+              >
+                <MenuItem value="" sx={{ fontSize: '0.85rem' }}>All Products</MenuItem>
+                {categories.map((category) => (
+                  <MenuItem key={category.id} value={category.id} sx={{ fontSize: '0.85rem' }}>
+                    {category.name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
+            <FormControl size="small" sx={{ flex: 1, minWidth: '120px' , width: '100%',}}
+             variant="standard">
+              <InputLabel shrink={true} sx={{ fontSize: '0.8rem' }}>Collection</InputLabel>
+              <Select 
+                value={selectedCollection} 
+                onChange={(e) => setSelectedCollection(e.target.value)} 
+                label="Collection"
+                displayEmpty
+                sx={{ fontSize: '0.85rem' }}
+              >
+                <MenuItem value="" sx={{ fontSize: '0.85rem' }}>All Collections</MenuItem>
+                <MenuItem value="Winter" sx={{ fontSize: '0.85rem' }}>Winter Collection</MenuItem>
+                <MenuItem value="Summer" sx={{ fontSize: '0.85rem' }}>Summer Collection</MenuItem>
+              </Select>
+            </FormControl>
+           
           </Box>
         </Box>
 
         {/* Desktop layout */}
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1.5, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-            <TextField placeholder="Search..." value={searchTerm} onChange={handleSearch} size="small" sx={{ minWidth: 180, '& .MuiOutlinedInput-root': { fontSize: '0.85rem', borderRadius: 0 } }} InputProps={{ startAdornment: <Search sx={{ mr: 0.5, color: '#666', fontSize: '18px' }} /> }} />
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel shrink={true}>Category</InputLabel>
-              <Select value={selectedCategory} onChange={handleCategoryChange} label="Category" displayEmpty>
-                <MenuItem value="">All Products</MenuItem>
-                {categories.map((category) => (<MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>))}
-            </Select>
-          </FormControl>
+        <Box sx={{ 
+          display: { xs: 'none', md: 'flex' }, 
+          gap: 2, 
+          flexWrap: 'wrap', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          flexDirection: { md: 'row', lg: 'row' }
+        }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <TextField 
+              placeholder="Search products..." 
+              value={searchTerm} 
+              onChange={handleSearch} 
+              size="small" 
+              sx={{ 
+                minWidth: { md: 200, lg: 250 }, 
+                '& .MuiOutlinedInput-root': { 
+                  fontSize: '0.85rem', 
+                  borderRadius: 1,
+                  backgroundColor: '#f9f9f9'
+                } 
+              }} 
+              InputProps={{ 
+                startAdornment: <Search sx={{ mr: 1, color: '#666', fontSize: '18px' }} /> 
+              }} 
+            />
+            <FormControl size="small" sx={{ minWidth: { md: 160, lg: 180 } }}>
+              <InputLabel shrink={true} sx={{ fontSize: '0.8rem' }}>Category</InputLabel>
+              <Select 
+                value={selectedCategory} 
+                onChange={handleCategoryChange} 
+                label="Category" 
+                displayEmpty
+                sx={{ fontSize: '0.85rem' }}
+              >
+                <MenuItem value="" sx={{ fontSize: '0.85rem' }}>All Products</MenuItem>
+                {categories.map((category) => (
+                  <MenuItem key={category.id} value={category.id} sx={{ fontSize: '0.85rem' }}>
+                    {category.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: { md: 140, lg: 160 } }}>
+              <InputLabel shrink={true} sx={{ fontSize: '0.8rem' }}>Collection</InputLabel>
+              <Select 
+                value={selectedCollection} 
+                onChange={(e) => setSelectedCollection(e.target.value)} 
+                label="Collection"
+                displayEmpty
+                sx={{ fontSize: '0.85rem' }}
+              >
+                <MenuItem value="" sx={{ fontSize: '0.85rem' }}>All Collections</MenuItem>
+                <MenuItem value="Winter" sx={{ fontSize: '0.85rem' }}>Winter Collection</MenuItem>
+                <MenuItem value="Summer" sx={{ fontSize: '0.85rem' }}>Summer Collection</MenuItem>
+              </Select>
+            </FormControl>
+           
           </Box>
-          <Button variant="text" onClick={() => { setSearchTerm(""); setSelectedCategory(""); setSortBy("created_at"); setSortOrder('desc'); setCurrentPage(1); }} sx={{ fontSize: '0.8rem', color: '#666', textTransform: 'none', minWidth: 'auto', px: 1 }}>Clear all</Button>
+          <Button 
+            variant="text" 
+            onClick={() => { 
+              setSearchTerm(""); 
+              setSelectedCategory(""); 
+              setSelectedCollection("");
+              setSortBy("created_at"); 
+              setSortOrder('desc'); 
+              setCurrentPage(1); 
+            }} 
+            sx={{ 
+              fontSize: '0.8rem', 
+              color: '#666', 
+              textTransform: 'none', 
+              minWidth: 'auto', 
+              px: 2,
+              py: 1,
+              border: '1px solid #e0e0e0',
+              borderRadius: 1,
+              '&:hover': {
+                backgroundColor: '#f5f5f5'
+              }
+            }}
+          >
+            Clear all
+          </Button>
         </Box>
       </Box>
 
@@ -374,7 +526,7 @@ const fetchCategories = async () => {
       )}
 
       {/* Products Grid */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 4, minHeight: '400px' }}>
         {loading || isInitialLoad ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
             <CircularProgress />
@@ -389,215 +541,87 @@ const fetchCategories = async () => {
             </Typography>
           </Box>
         ) : (
-          <Grid 
-            container 
-            spacing={2} 
+          <Box
             sx={{ 
-              width: '100%',
-              margin: 0,
-              justifyContent: 'center',
-              '& .MuiGrid-item': {
-                paddingLeft: '8px',
-                paddingTop: '8px',
-                display: 'flex',
-                justifyContent: 'center',
-              }
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "repeat(2, 1fr)",
+                sm: "repeat(2, 1fr)",
+                md: "repeat(3, 1fr)",
+                lg: "repeat(4, 1fr)",
+              },
+              gap: { xs: 1, sm: 2, md: 3 },
+              px: { xs: 1, sm: 2, md: 4 },
+              justifyContent: "center",
+              minHeight: "400px",
+              alignItems: "start",
             }}
           >
-            {filteredProducts.map((product) => (
-              <Grid item xs={6} sm={6} md={3} lg={3} xl={3} key={product.id} sx={{ 
-                display: 'flex', 
-                justifyContent: 'center',
-                minWidth: { xs: 'auto', sm: '280px' },
-              }}>
-                <Card
-                  sx={{
-                    height: '470px',
-                    width: { xs: '47vw', sm: '280px' },
-                    minWidth: { xs: 'auto', sm: '280px' },
-                    maxWidth: { xs: '47vw', sm: '280px' },
-                    display: 'flex',
-                    flexDirection: 'column',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    borderRadius: 0,
-                    boxShadow: 'none',
-                    border: '1px solid #f0f0f0',
-                    flexShrink: 0,
-                    '&:hover': {
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    },
-                  }}
-                  onClick={() => handleProductClick(product.id)}
-                >
-                  <Box
-                    sx={{
-                      position: 'relative',
-                      width: { xs: '47vw', sm: '280px' },
-                      height: '320px',
-                      minHeight: '320px',
-                      maxHeight: '320px',
-                      overflow: 'hidden',
-                      backgroundColor: '#f9f9f9',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <img
-                      src={getProductImageUrl(product.images)}
-                      alt={product.name}
-                      style={{
-                        width: '100%',
-                        height: '320px',
-                        objectFit: 'cover',
-                        objectPosition: 'center',
-                        display: 'block',
-                      }}
-                    />
-                  </Box>
-                  <CardContent sx={{ 
-                    height: '150px', // Increased height for better button spacing
-                    minHeight: '150px',
-                    maxHeight: '150px',
-                    width: '280px', // Fixed width matching card
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    justifyContent: 'space-between', // Distribute space evenly
-                    p: 1.5, 
-                    pb: 2.5, // Increased bottom padding for buttons
-                    '&:last-child': { pb: 2.5 }, // Ensure bottom padding
-                    overflow: 'hidden' // Prevent content overflow
-                  }}>
-                    <Box sx={{ mb: 0.5 }}>
-                      <Chip
-                        label={product.category?.name || "FASHION"}
-                        size="small"
-                        sx={{
-                          backgroundColor: '#f5f5f5',
-                          color: '#666',
-                          fontSize: '0.6rem',
-                          height: '18px',
-                          borderRadius: 0,
-                        }}
-                      />
-                    </Box>
-
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        fontWeight: 400,
-                        color: '#000',
-                        mb: 0.5,
-                        fontSize: '0.85rem',
-                        lineHeight: 1.2,
-                        height: '2.4em', // Fixed height for 2 lines
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {product.name}
-                    </Typography>
-
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, mt: 'auto' }}>
-                      <Typography
-                        variant="body1"
-                        sx={{
-                          fontWeight: 600,
-                          color: '#000',
-                          fontSize: '0.9rem',
-                        }}
-                      >
-                        ₨{Math.round(product.sale_price || product.price)}
-                      </Typography>
-                      {product.sale_price && (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: '#999',
-                            textDecoration: 'line-through',
-                            fontSize: '0.8rem',
-                          }}
-                        >
-                          ₨{Math.round(product.price)}
-                        </Typography>
-                      )}
-                    </Box>
-
-                    {/* Spacer to push buttons to bottom */}
-                    <Box sx={{ flex: 1 }} />
-
-                    <Box sx={{ 
-                      display: 'flex', 
-                      gap: 1, // Increased gap between buttons
-                      mt: 1, // Add top margin for separation
-                      mb: 1.5, // Increased bottom margin for better visibility
-                      px: 0.5 // Add horizontal padding
-                    }}>
-                      <Button
-                        variant="contained"
-                        onClick={(e) => handleAddToCart(product, e)}
-                        sx={{
-                          width: '180px', // Fixed width instead of flex: 1
-                          backgroundColor: '#FFD700',
-                          color: '#000',
-                          fontSize: '0.65rem', // Slightly smaller font
-                          fontWeight: 600,
-                          py: 0.8,
-                          px: 1,
-                          borderRadius: 0,
-                          textTransform: 'uppercase',
-                          minWidth: 'auto',
-                          '&:hover': {
-                            backgroundColor: '#FFC107',
-                          },
-                        }}
-                      >
-                        Add to Cart
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleProductClick(product.id);
-                        }}
-                        sx={{
-                          minWidth: '45px',
-                          width: '45px', // Slightly larger for better proportion
-                          height: '36px', // Match Add to Cart button height
-                          borderColor: '#FFD700',
-                          color: '#FFD700',
-                          fontSize: '0.7rem',
-                          py: 0.8,
-                          px: 0.5,
-                          borderRadius: 0,
-                          '&:hover': {
-                            borderColor: '#FFC107',
-                            color: '#FFC107',
-                            backgroundColor: 'rgba(255, 215, 0, 0.04)',
-                          },
-                        }}
-                      >
-                        <Visibility sx={{ fontSize: '16px' }} />
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+            {filteredProducts.slice(0, visibleCount).map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={handleAddToCart}
+                  showHoverButtons={true}
+                  showDiscount={true}
+                  showWishlist={true}
+                  showQuickView={true}
+                  showAddToCart={true}
+                  showStock={true}
+                  cardHeight="auto"
+                  imageHeight="250px"
+                />
             ))}
-          </Grid>
+                    </Box>
         )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={handlePageChange}
-            color="primary"
-            size="large"
-          />
+      {/* See More Button */}
+      {filteredProducts.length > visibleCount && (
+                    <Box sx={{ 
+          display: "flex",
+          justifyContent: "center",
+          mt: { xs: 4, md: 6 },
+          px: { xs: 1, sm: 2, md: 4 }
+                    }}>
+                      <Button
+            onClick={handleSeeMore}
+            disabled={loadingMore}
+                        variant="contained"
+                        sx={{
+              backgroundColor: "#FFD700",
+              color: "#2C2C2C",
+              fontWeight: "bold",
+              fontSize: { xs: "0.9rem", sm: "1rem" },
+              px: { xs: 4, sm: 6 },
+              py: { xs: 1.2, sm: 1.5 },
+              borderRadius: { xs: "12px", sm: "8px" },
+              textTransform: "none",
+              minWidth: { xs: "160px", sm: "200px" },
+              height: { xs: "44px", sm: "48px" },
+              boxShadow: "0 4px 12px rgba(255, 215, 0, 0.3)",
+              "&:hover": {
+                backgroundColor: "#FFC107",
+                transform: "translateY(-2px)",
+                boxShadow: "0 6px 16px rgba(255, 215, 0, 0.4)",
+              },
+              "&:disabled": {
+                backgroundColor: "#E0E0E0",
+                color: "#9E9E9E",
+                transform: "none",
+                boxShadow: "none",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
+            {loadingMore ? (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <CircularProgress size={20} sx={{ color: "#2C2C2C" }} />
+                <span>Loading...</span>
+                    </Box>
+            ) : (
+              `View More (${filteredProducts.length - visibleCount} left)`
+            )}
+          </Button>
         </Box>
       )}
       </Box>
@@ -626,6 +650,14 @@ const fetchCategories = async () => {
           </Alert>
         )}
       </Box>
+
+      {/* Cart Drawer */}
+      <CartDrawer
+        open={cartDrawerOpen}
+        onClose={handleCartDrawerClose}
+        product={selectedProduct}
+        onAddToCart={handleAddToCart}
+      />
     </Box>
   );
 };

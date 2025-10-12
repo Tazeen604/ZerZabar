@@ -68,19 +68,14 @@ const Sidebar = ({ open, onToggle }) => {
       text: 'Orders',
       icon: <ShoppingCart />,
       path: '/admin/orders',
-      hasSubmenu: true,
-      subItems: [
-        { text: 'All Orders', path: '/admin/orders' },
-        { text: 'Pending Orders', path: '/admin/orders/pending' },
-        { text: 'Completed Orders', path: '/admin/orders/completed' },
-      ],
+     
     },
-    {
-      text: 'Reports',
-      icon: <BarChart />,
-      path: '/admin/reports',
-      hasSubmenu: false,
-    },
+   // {
+    //  text: 'Reports',
+    //  icon: <BarChart />,
+    //  path: '/admin/reports',
+    //  hasSubmenu: false,
+    //},
     {
       text: 'Settings',
       icon: <Settings />,

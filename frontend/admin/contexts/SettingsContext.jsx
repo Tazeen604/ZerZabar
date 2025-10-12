@@ -61,7 +61,10 @@ export const SettingsProvider = ({ children }) => {
     try {
       const response = await apiService.post('/admin/settings', newSettings);
       if (response.success) {
+        // Update local settings immediately
         setSettings(prev => ({ ...prev, ...newSettings }));
+        // Refresh settings from server to ensure consistency
+        await fetchSettings();
         return true;
       } else {
         setError(response.message || 'Failed to update settings');
@@ -104,8 +107,8 @@ export const SettingsProvider = ({ children }) => {
     }
   };
 
-  const refreshSettings = () => {
-    fetchSettings();
+  const refreshSettings = async () => {
+    await fetchSettings();
   };
 
   const value = {

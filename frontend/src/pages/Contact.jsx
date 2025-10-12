@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -9,6 +9,7 @@ import {
   Paper,
   IconButton,
 } from '@mui/material';
+import Breadcrumbs from '../components/Breadcrumbs';
 import {
   LocationOn,
   Phone,
@@ -19,7 +20,6 @@ import {
   YouTube,
   MusicNote,
 } from '@mui/icons-material';
-import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 const Contact = () => {
@@ -34,6 +34,11 @@ const Contact = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null); // 'success', 'error', null
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -148,14 +153,14 @@ const Contact = () => {
 
   return (
     <>
-      <Navbar />
       <Box sx={{ 
         minHeight: 'calc(100vh - 120px)', 
-        backgroundColor: 'white',
+        backgroundColor: '#fff',
         py: { xs: 4, sm: 6, md: 8 },
         px: { xs: 2, sm: 4, md: 6 },
         mt: { xs: 2, sm: 4, md: 6 }
       }}>
+          <Breadcrumbs />
         <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: '100%', md: '1200px' }, mx: 'auto' }}>
           <Typography
             variant="h1"
@@ -189,7 +194,7 @@ const Contact = () => {
               width: { xs: '100%', md: '33%' }, 
               flex: { xs: 'none', md: '0 0 33%' }, 
               display: 'flex',
-              order: { xs: 1, md: 1 }
+              order: { xs: 2, md: 1 }
             }}>
                 <Paper
                   sx={{
@@ -322,7 +327,7 @@ const Contact = () => {
                   <Box sx={{ 
                     display: 'flex', 
                     justifyContent: 'center', 
-                    gap: { xs: 1.5, sm: 2 }, 
+                    gap: { xs: 1, sm: 1 }, 
                     mt: 2,
                     flexWrap: 'wrap'
                   }}>
@@ -431,7 +436,7 @@ const Contact = () => {
               width: { xs: '100%', md: '67%' }, 
               flex: { xs: 'none', md: '0 0 67%' }, 
               display: 'flex',
-              order: { xs: 2, md: 2 }
+              order: { xs: 1, md: 2 }
             }}>
               <Paper
                 sx={{
@@ -717,7 +722,7 @@ const Contact = () => {
                         disabled={isSubmitting}
                         sx={{
                           backgroundColor: isSubmitting ? '#ccc' : '#FFD700',
-                          color: 'white',
+                          color: '#000',
                           fontWeight: 600,
                           fontSize: '1rem',
                           px: 4,

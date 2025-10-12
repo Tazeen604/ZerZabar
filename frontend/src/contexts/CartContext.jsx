@@ -5,24 +5,23 @@ const CartContext = createContext();
 const cartReducer = (state, action) => {
   switch (action.type) {
     case 'ADD_TO_CART':
+      // Check if an item with the same cartId already exists
       const existingItem = state.items.find(
-        item => item.id === action.payload.id && 
-        item.size === action.payload.size && 
-        item.color === action.payload.color
+        item => item.cartId === action.payload.cartId
       );
 
       if (existingItem) {
+        // If same cartId exists, update quantity
         return {
           ...state,
           items: state.items.map(item =>
-            item.id === action.payload.id && 
-            item.size === action.payload.size && 
-            item.color === action.payload.color
+            item.cartId === action.payload.cartId
               ? { ...item, quantity: item.quantity + action.payload.quantity }
               : item
           ),
         };
       } else {
+        // Add as new item
         return {
           ...state,
           items: [...state.items, action.payload],
@@ -88,7 +87,12 @@ export const CartProvider = ({ children }) => {
       cartItem = {
         cartId: `${product.id}-${product.size || size}-${product.color || color}-${Date.now()}`,
         ...product,
+        price: parseFloat(product.price || 0),
         quantity: product.quantity || quantity,
+        // Store product variants for cart editing
+        sizes: product.sizes || [],
+        colors: product.colors || [],
+        variants: product.variants || []
       };
     } else {
       // Old format: separate parameters
@@ -96,12 +100,16 @@ export const CartProvider = ({ children }) => {
         cartId: `${product.id}-${size}-${color}-${Date.now()}`,
         id: product.id,
         name: product.name,
-        price: product.price,
-        originalPrice: product.originalPrice,
+        price: parseFloat(product.price || 0),
+        originalPrice: product.originalPrice ? parseFloat(product.originalPrice) : null,
         image: product.image,
         size,
         color,
         quantity,
+        // Store product variants for cart editing
+        sizes: product.sizes || [],
+        colors: product.colors || [],
+        variants: product.variants || []
       };
     }
     

@@ -51,6 +51,7 @@ const AddProduct = () => {
     description: '',
     category_id: '',
     subcategory_id: '',
+    collection: '',
     sku: '',
     price: '',
     sale_price: '',
@@ -229,43 +230,85 @@ const AddProduct = () => {
   const validateForm = () => {
     const errors = {};
 
-    // Required field validations
+    // Product ID validation
+    if (!productForm.product_id.trim()) {
+      errors.product_id = 'Product ID is required';
+    } else if (productForm.product_id.length > 50) {
+      errors.product_id = 'Product ID cannot exceed 50 characters';
+    }
+
+    // Product name validation
     if (!productForm.name.trim()) {
       errors.name = 'Product name is required';
     } else if (productForm.name.length < 3) {
       errors.name = 'Product name must be at least 3 characters';
+    } else if (productForm.name.length > 255) {
+      errors.name = 'Product name cannot exceed 255 characters';
     }
 
+    // Description validation
     if (!productForm.description.trim()) {
       errors.description = 'Product description is required';
     } else if (productForm.description.length < 10) {
       errors.description = 'Description must be at least 10 characters';
+    } else if (productForm.description.length > 2000) {
+      errors.description = 'Description cannot exceed 2000 characters';
     }
 
+    // Category validation
     if (!productForm.category_id) {
       errors.category_id = 'Category is required';
     }
 
+    // SKU validation
     if (!productForm.sku.trim()) {
       errors.sku = 'SKU is required';
-    }
-
-    if (!productForm.price || productForm.price <= 0) {
-      errors.price = 'Valid price is required';
-    }
-
-    if (!productForm.stock_quantity || productForm.stock_quantity < 0) {
-      errors.stock_quantity = 'Valid stock quantity is required';
+    } else if (productForm.sku.length > 100) {
+      errors.sku = 'SKU cannot exceed 100 characters';
     }
 
     // Price validation
-    if (productForm.sale_price && parseFloat(productForm.sale_price) >= parseFloat(productForm.price)) {
-      errors.sale_price = 'Sale price must be less than regular price';
+    if (!productForm.price || productForm.price <= 0) {
+      errors.price = 'Valid price is required';
+    } else if (parseFloat(productForm.price) > 999999.99) {
+      errors.price = 'Price cannot exceed 999,999.99';
+    }
+
+    // Sale price validation
+    if (productForm.sale_price) {
+      if (parseFloat(productForm.sale_price) < 0) {
+        errors.sale_price = 'Sale price cannot be negative';
+      } else if (parseFloat(productForm.sale_price) >= parseFloat(productForm.price)) {
+        errors.sale_price = 'Sale price must be less than regular price';
+      } else if (parseFloat(productForm.sale_price) > 999999.99) {
+        errors.sale_price = 'Sale price cannot exceed 999,999.99';
+      }
+    }
+
+    // Stock quantity validation
+    if (!productForm.stock_quantity || productForm.stock_quantity < 0) {
+      errors.stock_quantity = 'Valid stock quantity is required';
+    } else if (parseInt(productForm.stock_quantity) > 999999) {
+      errors.stock_quantity = 'Stock quantity cannot exceed 999,999';
+    }
+
+    // Weight validation
+    if (productForm.weight && parseFloat(productForm.weight) < 0) {
+      errors.weight = 'Weight cannot be negative';
+    } else if (productForm.weight && parseFloat(productForm.weight) > 9999.99) {
+      errors.weight = 'Weight cannot exceed 9999.99';
+    }
+
+    // Dimensions validation
+    if (productForm.dimensions && productForm.dimensions.length > 100) {
+      errors.dimensions = 'Dimensions cannot exceed 100 characters';
     }
 
     // Image validation
     if (images.length === 0) {
       errors.images = 'At least one product image is required';
+    } else if (images.length > 10) {
+      errors.images = 'Cannot upload more than 10 images';
     }
 
     // Check image sizes
@@ -360,12 +403,29 @@ const AddProduct = () => {
         navigate('/admin/product-management');
       }, 2000);
     } catch (err) {
+      console.error('Product creation error:', err);
+      
       if (err.response?.data?.errors) {
         // Handle validation errors from backend
         setValidationErrors(err.response.data.errors);
         setError('Please fix the validation errors below');
       } else {
-        setError(err.response?.data?.message || 'Failed to create product');
+        // Handle specific database errors
+        const errorMessage = err.message || err.response?.data?.message || 'Failed to create product';
+        
+        if (errorMessage.includes('Duplicate entry') && errorMessage.includes('slug_unique')) {
+          setError('A product with a similar name already exists. Please choose a different product name.');
+        } else if (errorMessage.includes('Duplicate entry') && errorMessage.includes('sku')) {
+          setError('This SKU already exists. Please choose a different SKU.');
+        } else if (errorMessage.includes('Duplicate entry') && errorMessage.includes('product_id')) {
+          setError('This Product ID already exists. Please try again.');
+        } else if (errorMessage.includes('Integrity constraint violation')) {
+          setError('There was a data conflict. Please check your input and try again.');
+        } else if (errorMessage.includes('SQLSTATE')) {
+          setError('Database error occurred. Please contact support if this continues.');
+        } else {
+          setError(errorMessage);
+        }
       }
     } finally {
       setLoading(false);
@@ -486,25 +546,22 @@ const AddProduct = () => {
                   />
                 </Grid>
 
+                <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth required error={!!validationErrors.category_id}>
+                  <FormControl fullWidth required error={!!validationErrors.category_id} 
+                  variant="standard"
+                  sx={{
+                    m: 1,
+                    minWidth: 200, // wider for full label visibility
+                    width: '100%',
+                  }}>
                     <InputLabel>Category</InputLabel>
+
                     <Select
                       value={productForm.category_id}
                       onChange={(e) => handleInputChange('category_id', e.target.value)}
                       label="Category"
-                      displayEmpty
-                      renderValue={(selected) => {
-                        if (!selected) {
-                          return <span style={{ color: '#999' }}>Select a category</span>;
-                        }
-                        const category = categories.find(cat => cat.id === selected);
-                        return category ? category.name : '';
-                      }}
                     >
-                      <MenuItem value="" disabled>
-                        <em>Select a category</em>
-                      </MenuItem>
                       {categories.map((category) => (
                         <MenuItem key={category.id} value={category.id}>
                           {category.name}
@@ -518,10 +575,19 @@ const AddProduct = () => {
                     )}
                   </FormControl>
                 </Grid>
+                </Grid>
+          
+
 
                 <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Subcategory (Optional)</InputLabel>
+                  <FormControl fullWidth
+                  variant="standard"
+                  sx={{
+                    m: 1,
+                    minWidth: 200, // wider for full label visibility
+                    width: '100%',
+                  }}>
+               
                     <Select
                       value={productForm.subcategory_id}
                       onChange={(e) => handleInputChange('subcategory_id', e.target.value)}
@@ -550,6 +616,29 @@ const AddProduct = () => {
                   </FormControl>
                 </Grid>
 
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth
+                  variant="standard"
+                  sx={{
+                    m: 1,
+                    minWidth: 200,
+                    width: '100%',
+                  }}>
+                    <InputLabel>Collection (Optional)</InputLabel>
+                    <Select
+                      value={productForm.collection}
+                      onChange={(e) => handleInputChange('collection', e.target.value)}
+                      label="Collection (Optional)"
+                    >
+                      <MenuItem value="">
+                        <em>No collection</em>
+                      </MenuItem>
+                      <MenuItem value="Winter">Winter Collection</MenuItem>
+                      <MenuItem value="Summer">Summer Collection</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+ 
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
@@ -873,6 +962,15 @@ const AddProduct = () => {
                 />
               </Box>
             </CardContent>
+            <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : <Save />}
+            sx={{ backgroundColor: '#FFD700', color: '#000', '&:hover': { backgroundColor: '#F57F17' } ,mb:2}}
+          >
+            Save Product
+          </Button>
           </Card>
         </Grid>
       </Grid>

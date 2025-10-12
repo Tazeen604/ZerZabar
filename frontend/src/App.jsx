@@ -15,6 +15,7 @@ import NewArrivals from "./pages/NewArrivals";
 import Checkout from "./pages/Checkout";
 import Contact from "./pages/Contact";
 import { CartProvider } from "./contexts/CartContext";
+import useScrollToTop from "./hooks/useScrollToTop";
 import AdminApp from "../admin/AdminApp";
 
 function HomePage() {
@@ -34,7 +35,17 @@ function App() {
   return (
     <CartProvider>
       <Router>
-        <Box sx={{ width: "100%", overflowX: "hidden", minHeight: "100vh", backgroundColor: "rgba(0, 0, 0, 0.8)" }}>
+        <AppWithRouter />
+      </Router>
+    </CartProvider>
+  );
+}
+
+function AppWithRouter() {
+  useScrollToTop();
+  
+  return (
+    <Box sx={{ width: "100%", overflowX: "hidden", minHeight: "100vh", backgroundColor: "rgba(0, 0, 0, 0.8)" }}>
           <Routes>
             {/* Admin Panel Routes */}
             <Route path="/admin" element={<AdminApp />} />
@@ -85,8 +96,6 @@ function App() {
             } />
           </Routes>
         </Box>
-      </Router>
-    </CartProvider>
   );
 }
 

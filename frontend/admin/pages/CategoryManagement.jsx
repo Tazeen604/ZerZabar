@@ -54,6 +54,7 @@ const CategoryManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [validationErrors, setValidationErrors] = useState({});
   const [apiError, setApiError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogType, setDialogType] = useState('category'); // 'category' or 'subcategory'
@@ -127,7 +128,69 @@ const CategoryManagement = () => {
     }
   };
 
+  const validateCategoryForm = () => {
+    const errors = {};
+
+    // Category name validation
+    if (!categoryForm.name.trim()) {
+      errors.name = 'Category name is required';
+    } else if (categoryForm.name.length < 2) {
+      errors.name = 'Category name must be at least 2 characters';
+    } else if (categoryForm.name.length > 255) {
+      errors.name = 'Category name cannot exceed 255 characters';
+    }
+
+    // Description validation
+    if (categoryForm.description && categoryForm.description.length > 1000) {
+      errors.description = 'Description cannot exceed 1000 characters';
+    }
+
+    // Sort order validation
+    if (categoryForm.sort_order && (categoryForm.sort_order < 0 || categoryForm.sort_order > 9999)) {
+      errors.sort_order = 'Sort order must be between 0 and 9999';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateSubcategoryForm = () => {
+    const errors = {};
+
+    // Subcategory name validation
+    if (!subcategoryForm.name.trim()) {
+      errors.name = 'Subcategory name is required';
+    } else if (subcategoryForm.name.length < 2) {
+      errors.name = 'Subcategory name must be at least 2 characters';
+    } else if (subcategoryForm.name.length > 255) {
+      errors.name = 'Subcategory name cannot exceed 255 characters';
+    }
+
+    // Category validation
+    if (!subcategoryForm.category_id) {
+      errors.category_id = 'Category is required';
+    }
+
+    // Description validation
+    if (subcategoryForm.description && subcategoryForm.description.length > 1000) {
+      errors.description = 'Description cannot exceed 1000 characters';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCategorySubmit = async () => {
+    // Clear previous errors
+    setError('');
+    setValidationErrors({});
+
+    // Validate form
+    if (!validateCategoryForm()) {
+      setError('Please fix the validation errors below');
+      return;
+    }
+
     try {
       setLoading(true);
       if (editingItem) {
@@ -141,13 +204,39 @@ const CategoryManagement = () => {
       fetchCategories();
       handleCloseDialog();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save category');
+      console.error('Category save error:', err);
+      
+      if (err.response?.data?.errors) {
+        // Handle validation errors from backend
+        setValidationErrors(err.response.data.errors);
+        setError('Please fix the validation errors below');
+      } else {
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to save category';
+        
+        if (errorMessage.includes('Duplicate entry') && errorMessage.includes('name')) {
+          setError('A category with this name already exists. Please choose a different category name.');
+        } else if (errorMessage.includes('SQLSTATE')) {
+          setError('Database error occurred. Please contact support if this continues.');
+        } else {
+          setError(errorMessage);
+        }
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleSubcategorySubmit = async () => {
+    // Clear previous errors
+    setError('');
+    setValidationErrors({});
+
+    // Validate form
+    if (!validateSubcategoryForm()) {
+      setError('Please fix the validation errors below');
+      return;
+    }
+
     try {
       setLoading(true);
       if (editingItem) {
@@ -161,7 +250,23 @@ const CategoryManagement = () => {
       fetchSubcategories();
       handleCloseDialog();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save subcategory');
+      console.error('Subcategory save error:', err);
+      
+      if (err.response?.data?.errors) {
+        // Handle validation errors from backend
+        setValidationErrors(err.response.data.errors);
+        setError('Please fix the validation errors below');
+      } else {
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to save subcategory';
+        
+        if (errorMessage.includes('Duplicate entry') && errorMessage.includes('name')) {
+          setError('A subcategory with this name already exists. Please choose a different subcategory name.');
+        } else if (errorMessage.includes('SQLSTATE')) {
+          setError('Database error occurred. Please contact support if this continues.');
+        } else {
+          setError(errorMessage);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -502,7 +607,9 @@ const CategoryManagement = () => {
               fullWidth
               label="Category Name"
               value={categoryForm.name}
-                    onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+              onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+              error={!!validationErrors.name}
+              helperText={validationErrors.name}
               required
             />
                 </Grid>
@@ -513,8 +620,10 @@ const CategoryManagement = () => {
               multiline
               rows={3}
               value={categoryForm.description}
-                    onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                  />
+              onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+              error={!!validationErrors.description}
+              helperText={validationErrors.description}
+            />
                 </Grid>
                 <Grid item xs={6}>
                   <TextField
@@ -523,6 +632,8 @@ const CategoryManagement = () => {
                     type="number"
                     value={categoryForm.sort_order}
                     onChange={(e) => setCategoryForm({ ...categoryForm, sort_order: parseInt(e.target.value) })}
+                    error={!!validationErrors.sort_order}
+                    helperText={validationErrors.sort_order}
                   />
                 </Grid>
                 <Grid item xs={6}>
@@ -540,7 +651,15 @@ const CategoryManagement = () => {
             ) : (
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <FormControl fullWidth required>
+                  <FormControl fullWidth required
+                    variant="standard"
+                    error={!!validationErrors.category_id}
+                    sx={{
+                      m: 1,
+                      minWidth: 200, // wider for full label visibility
+                      width: '100%',
+                      gap:2
+                    }}>
                     <InputLabel>Category</InputLabel>
                     <Select
                       value={subcategoryForm.category_id}
@@ -553,6 +672,11 @@ const CategoryManagement = () => {
                         </MenuItem>
                       ))}
                     </Select>
+                    {validationErrors.category_id && (
+                      <Typography variant="caption" color="error" sx={{ mt: 1, ml: 2 }}>
+                        {validationErrors.category_id}
+                      </Typography>
+                    )}
                   </FormControl>
                 </Grid>
                 <Grid item xs={12}>
@@ -561,6 +685,8 @@ const CategoryManagement = () => {
                     label="Subcategory Name"
                     value={subcategoryForm.name}
                     onChange={(e) => setSubcategoryForm({ ...subcategoryForm, name: e.target.value })}
+                    error={!!validationErrors.name}
+                    helperText={validationErrors.name}
                     required
                   />
                 </Grid>
@@ -570,8 +696,11 @@ const CategoryManagement = () => {
                     label="Description"
                     multiline
                     rows={3}
+                    cols={6}
                     value={subcategoryForm.description}
                     onChange={(e) => setSubcategoryForm({ ...subcategoryForm, description: e.target.value })}
+                    error={!!validationErrors.description}
+                    helperText={validationErrors.description}
                   />
                 </Grid>
                 <Grid item xs={6}>

@@ -1,7 +1,18 @@
 import React from "react";
 import { Box, Typography, Button } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 const TwoCardSection = () => {
+  const navigate = useNavigate();
+
+  const handleWinterCollectionClick = () => {
+    navigate('/shop?collection=Winter');
+  };
+
+  const handleSummerCollectionClick = () => {
+    navigate('/shop?collection=Summer');
+  };
+
   return (
     <Box
       sx={{
@@ -83,6 +94,7 @@ const TwoCardSection = () => {
           <Button
             variant="contained"
             size="large"
+            onClick={handleWinterCollectionClick}
             sx={{
               backgroundColor: "#FFD700",
               color: "#333",
@@ -174,6 +186,7 @@ const TwoCardSection = () => {
           <Button
             variant="contained"
             size="large"
+            onClick={handleSummerCollectionClick}
             sx={{
               backgroundColor: "#FFD700",
               color: "#333",

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -15,6 +15,7 @@ import {
   Avatar,
   InputAdornment,
 } from "@mui/material";
+import Breadcrumbs from "../components/Breadcrumbs";
 import {
   Delete,
   Add,
@@ -45,6 +46,11 @@ const ViewCart = () => {
   } = useCart();
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const handleQuantityChange = (cartId, newQuantity) => {
     if (newQuantity < 1) {
@@ -120,6 +126,7 @@ const ViewCart = () => {
 
   return (
     <Box sx={{ minHeight: "100vh", background: "#ffffff", py: 4 }}>
+      <Breadcrumbs />
       <Box sx={{ maxWidth: "1800px", mx: "auto", px: 3 }}>
         {/* Header */}
         <Box sx={{ display: "flex", alignItems: "center", mb: 4,mt:8, justifyContent: "center" }}>

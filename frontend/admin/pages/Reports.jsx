@@ -110,13 +110,13 @@ const Reports = () => {
 
   const tabs = [
     { label: 'Summary Dashboard', value: 0 },
-    { label: 'Business Intelligence', value: 1 },
-    { label: 'Sales Analytics', value: 2 },
+
+ 
     { label: 'Financial Reports', value: 3 },
-    { label: 'Customer Analytics', value: 4 },
+  
     { label: 'Orders Report', value: 5 },
-    { label: 'Products Report', value: 6 },
-    { label: 'Inventory Report', value: 7 },
+ 
+  
   ];
 
   const renderSalesReport = () => (
@@ -533,7 +533,7 @@ const Reports = () => {
           Reports & Analytics
         </Typography>
         <Typography variant="body1" sx={{ color: '#757575' }}>
-          Comprehensive business insights and performance metrics
+          Zer Zaber insights and performance metrics
         </Typography>
       </Box>
 
@@ -608,7 +608,7 @@ const Reports = () => {
         <CardContent sx={{ p: 3 }}>
           {activeTab === 0 && <SummaryDashboard />}
           {activeTab === 1 && <BusinessIntelligence />}
-          {activeTab === 2 && <SalesAnalytics />}
+      
           {activeTab === 3 && <FinancialReports />}
           {activeTab === 4 && <CustomerAnalytics />}
           {activeTab === 5 && renderOrdersReport()}

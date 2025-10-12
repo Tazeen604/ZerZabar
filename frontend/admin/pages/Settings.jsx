@@ -39,6 +39,7 @@ import {
   Delete,
   Check,
   Close,
+  Refresh,
 } from '@mui/icons-material';
 import apiService from '../../src/services/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -93,6 +94,8 @@ const Settings = () => {
       const response = await apiService.post('/admin/settings', settings);
       if (response.success) {
         setSuccess(true);
+        // Refresh settings from server to ensure consistency
+        await fetchSettings();
       } else {
         setError(response.message || 'Failed to save settings');
       }
@@ -181,19 +184,37 @@ const Settings = () => {
             Configure system-wide settings and thresholds
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Save />}
-          onClick={handleSave}
-          disabled={saving}
-          sx={{
-            backgroundColor: '#FFD700',
-            color: '#2C2C2C',
-            '&:hover': { backgroundColor: '#F57F17' },
-          }}
-        >
-          {saving ? 'Saving...' : 'Save Settings'}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={fetchSettings}
+            disabled={loading}
+            sx={{
+              borderColor: '#FFD700',
+              color: '#FFD700',
+              '&:hover': { 
+                borderColor: '#F57F17',
+                backgroundColor: '#FFF8E1'
+              },
+            }}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Save />}
+            onClick={handleSave}
+            disabled={saving}
+            sx={{
+              backgroundColor: '#FFD700',
+              color: '#2C2C2C',
+              '&:hover': { backgroundColor: '#F57F17' },
+            }}
+          >
+            {saving ? 'Saving...' : 'Save Settings'}
+          </Button>
+        </Box>
       </Box>
 
       {/* Settings Categories */}

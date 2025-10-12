@@ -223,6 +223,15 @@ const Dashboard = () => {
       bgColor: '#FFF3E0',
     },
     {
+      title: 'Total Variants',
+      value: data.inventory?.total_variants || 0,
+      change: `${data.inventory?.active_variants || 0} active`,
+      changeType: 'positive',
+      icon: <Inventory />,
+      color: '#9C27B0',
+      bgColor: '#F3E5F5',
+    },
+    {
       title: 'Growth Rate',
       value: `${data.growth?.revenue_growth || 0}%`,
       change: `Orders: ${data.growth?.orders_growth || 0}%`,
@@ -482,11 +491,24 @@ const Dashboard = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ fontSize: '1.2rem' }}>🛍️</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {order.items?.length || 0} items
-                        </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        {order.items && order.items.length > 0 ? (
+                          order.items.slice(0, 2).map((item, index) => (
+                            <Typography key={index} variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
+                              {item.product_name || item.product?.name || 'Unknown Product'}
+                              {item.quantity > 1 && ` (x${item.quantity})`}
+                            </Typography>
+                          ))
+                        ) : (
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            No items
+                          </Typography>
+                        )}
+                        {order.items && order.items.length > 2 && (
+                          <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                            +{order.items.length - 2} more items
+                          </Typography>
+                        )}
                       </Box>
                     </TableCell>
                     <TableCell>
@@ -708,9 +730,84 @@ const Dashboard = () => {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
                   <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Total Products</Typography>
                   <Typography variant="body2" sx={{ color: theme.palette.secondary.main, fontWeight: 'bold' }}>
-                    {dashboardData?.products?.total_products || 0}
+                    {dashboardData?.inventory?.total_products || 0}
                   </Typography>
                 </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Products with Variants</Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.info.main, fontWeight: 'bold' }}>
+                    {dashboardData?.inventory?.products_with_variants || 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Total Variants</Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
+                    {dashboardData?.inventory?.total_variants || 0}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Recent Inventory Movements */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
+                Recent Inventory Movements
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {(dashboardData?.recent_inventory_movements || []).map((movement, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      p: 2,
+                      borderRadius: '8px',
+                      backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
+                      '&:hover': {
+                        backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD',
+                        transform: 'translateX(4px)',
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
+                    <Avatar
+                      sx={{
+                        backgroundColor: movement.quantity_change > 0 ? theme.palette.success.main : theme.palette.error.main,
+                        width: 32,
+                        height: 32,
+                      }}
+                    >
+                      {movement.quantity_change > 0 ? <TrendingUp /> : <TrendingDown />}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
+                        {movement.inventory?.productVariant?.product?.name || 'Unknown Product'}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                        {movement.type_label} • {movement.quantity_change > 0 ? '+' : ''}{movement.quantity_change} units
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={movement.type_label}
+                      size="small"
+                      sx={{
+                        backgroundColor: movement.quantity_change > 0 ? `${theme.palette.success.main}20` : `${theme.palette.error.main}20`,
+                        color: movement.quantity_change > 0 ? theme.palette.success.main : theme.palette.error.main,
+                        textTransform: 'capitalize',
+                      }}
+                    />
+                  </Box>
+                ))}
+                {(!dashboardData?.recent_inventory_movements || dashboardData.recent_inventory_movements.length === 0) && (
+                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary, textAlign: 'center', py: 2 }}>
+                    No recent inventory movements
+                  </Typography>
+                )}
               </Box>
             </CardContent>
           </Card>

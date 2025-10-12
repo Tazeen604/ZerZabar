@@ -14,6 +14,7 @@ import Products from './pages/Products';
 import Inventory from './pages/Inventory';
 import LowStock from './pages/LowStock';
 import Orders from './pages/Orders';
+import OrderDetails from './pages/OrderDetails';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
@@ -131,6 +132,7 @@ const AdminAppContent = () => {
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/inventory/low-stock" element={<LowStock />} />
               <Route path="/orders" element={<Orders />} />
+              <Route path="/orders/:id" element={<OrderDetails />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Dashboard />} />

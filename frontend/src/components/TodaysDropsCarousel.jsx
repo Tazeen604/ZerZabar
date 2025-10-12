@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import api from "../services/api";
 import { getProductImageUrl } from "../utils/imageUtils";
+import CartSelectionModal from "./CartSelectionModal";
 
 const TodaysDropsCarousel = () => {
   const navigate = useNavigate();
@@ -30,6 +31,8 @@ const TodaysDropsCarousel = () => {
   const [visibleCount, setVisibleCount] = useState(40); // Start with 40 products
   const [loadingMore, setLoadingMore] = useState(false);
   const [hoveredProduct, setHoveredProduct] = useState(null);
+  const [cartModalOpen, setCartModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Fetch products
   useEffect(() => {
@@ -116,6 +119,16 @@ const TodaysDropsCarousel = () => {
     navigate(`/product/${productId}`);
   };
 
+  const handleAddToCartClick = (product) => {
+    setSelectedProduct(product);
+    setCartModalOpen(true);
+  };
+
+  const handleCartModalClose = () => {
+    setCartModalOpen(false);
+    setSelectedProduct(null);
+  };
+
   // Handle mobile touch events
   const handleTouchStart = (productId) => {
     setHoveredProduct(productId);
@@ -154,12 +167,11 @@ const TodaysDropsCarousel = () => {
     <Box
       sx={{
         backgroundColor: "#f8f9fa",
-        py: 6,
-        px: { xs: 2, md: 4 },
+        py: { xs: 4, sm: 5, md: 6 },
+        px: { xs: 2, sm: 3, md: 3, lg: 4 },
         borderRadius: "20px",
-        mx: { xs: 2, md: 4 },
-       
-        my: 4,
+        mx: { xs: 2, sm: 3, md: 3, lg: 4 },
+        my: { xs: 3, sm: 4, md: 4 },
       }}
     >
       {/* Header Section */}
@@ -168,8 +180,8 @@ const TodaysDropsCarousel = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          mb: { xs: 3, md: 4 },
-          px: { xs: 1, sm: 2, md: 4 },
+          mb: { xs: 3, sm: 3, md: 4 },
+          px: { xs: 1, sm: 2, md: 2, lg: 3 },
           flexDirection: { xs: "column", sm: "row" },
           gap: { xs: 2, sm: 0 },
         }}
@@ -212,8 +224,8 @@ const TodaysDropsCarousel = () => {
         sx={{
           display: "flex",
           gap: { xs: 0.5, sm: 1.5 },
-          mb: { xs: 3, md: 4 },
-          px: { xs: 1, sm: 2, md: 4 },
+          mb: { xs: 3, sm: 3, md: 4 },
+          px: { xs: 1, sm: 2, md: 2, lg: 3 },
           flexWrap: "nowrap",
           overflowX: { xs: "auto", sm: "visible" },
           justifyContent: { xs: "flex-start", sm: "flex-start" },
@@ -262,12 +274,14 @@ const TodaysDropsCarousel = () => {
           display: "grid",
           gridTemplateColumns: {
             xs: "repeat(2, 1fr)",
-            sm: "repeat(2, 1fr)",
-            md: "repeat(3, 1fr)",
+            sm: "repeat(3, 1fr)",
+            md: "repeat(4, 1fr)",
             lg: "repeat(4, 1fr)",
+            xl: "repeat(4, 1fr)",
           },
-          gap: { xs: 1.5, sm: 2, md: 3 },
-          px: { xs: 1, sm: 2, md: 4 },
+          gap: { xs: 1.5, sm: 2, md: 2.5, lg: 3 },
+          px: { xs: 1, sm: 2, md: 2, lg: 3 },
+          py: { xs: 1, sm: 2 },
         }}
       >
         {visibleProducts.map((product, index) => {
@@ -382,7 +396,7 @@ const TodaysDropsCarousel = () => {
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleAddToCart(product);
+                      handleAddToCartClick(product);
                     }}
                   >
                     <ShoppingCartIcon fontSize="small" />
@@ -407,35 +421,110 @@ const TodaysDropsCarousel = () => {
                 </Box>
               </Box>
 
-              {/* Product Details */}
-              <CardContent sx={{ p: 2 }}>
-
-
-                {/* Product Name */}
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontSize: "0.85rem",
-                    color: "#666",
-                    mb: 1,
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {product?.name || 'Unnamed Product'}
-                </Typography>
-                
-                {/* Pricing */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                  <Typography sx={{ fontWeight: 700, color: "#000" }}>
-                    ₨{Math.round(product?.sale_price || product?.price || 0)}
-                  </Typography>
-                  {product?.sale_price && product?.sale_price < product?.price && (
-                    <Typography sx={{ textDecoration: "line-through", color: "#888", fontSize: "0.85rem" }}>
-                      ₨{Math.round(product?.price || 0)}
-                    </Typography>
-                  )}
-                </Box>
-              </CardContent>
+               {/* Product Details */}
+               <CardContent sx={{ 
+                 p: { xs: 1.5, sm: 2 },
+                 height: "auto",
+                 minHeight: { xs: "140px", sm: "auto" },
+                 display: "flex",
+                 flexDirection: "column",
+                 justifyContent: "flex-start"
+               }}>
+                 <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                   {/* Category - Grey color */}
+                   {product.category && (
+                     <Typography 
+                       variant="body2" 
+                       sx={{ 
+                         color: "#666",
+                         fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                         textTransform: "uppercase",
+                         letterSpacing: "0.5px",
+                         fontWeight: 500
+                       }}
+                     >
+                       {product.category.name}
+                     </Typography>
+                   )}
+                   
+                   {/* Product Name - Black color */}
+                   <Typography
+                     variant="h6"
+                     sx={{
+                       fontWeight: 600,
+                       fontSize: { xs: "0.8rem", sm: "1rem" },
+                       lineHeight: 1.3,
+                       overflow: "hidden",
+                       textOverflow: "ellipsis",
+                       display: "-webkit-box",
+                       WebkitLineClamp: { xs: 2, sm: 2 },
+                       WebkitBoxOrient: "vertical",
+                       color: "#000",
+                       mb: 0.5,
+                       wordWrap: "break-word",
+                       whiteSpace: "normal"
+                     }}
+                   >
+                     {product?.name || 'Unnamed Product'}
+                   </Typography>
+                   
+                   {/* Product Price - Black color */}
+                   <Typography
+                     variant="h6"
+                     sx={{
+                       fontWeight: 600,
+                       color: "#000",
+                       fontSize: { xs: "0.9rem", sm: "1.1rem" },
+                       mb: 0.5
+                     }}
+                   >
+                     ₨{product?.sale_price || product?.price || 0}
+                   </Typography>
+                   
+                   {/* Stock Status - Red/Green color */}
+                   <Typography 
+                     variant="body2" 
+                     sx={{ 
+                       color: (() => {
+                         // Calculate total stock from variants if available, otherwise use legacy fields
+                         let totalStock = 0;
+                         
+                         if (product.variants && product.variants.length > 0) {
+                           // Use variant inventory
+                           totalStock = product.variants.reduce((sum, variant) => {
+                             return sum + (variant.inventory?.quantity || 0);
+                           }, 0);
+                         } else {
+                           // Fallback to legacy inventory fields
+                           totalStock = product.stock || product.inventory?.quantity || product.quantity || 0;
+                         }
+                         
+                         return totalStock > 0 ? "#4CAF50" : "#f44336";
+                       })(),
+                       fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                       fontWeight: 600,
+                       display: "block"
+                     }}
+                   >
+                     {(() => {
+                       // Calculate total stock from variants if available, otherwise use legacy fields
+                       let totalStock = 0;
+                       
+                       if (product.variants && product.variants.length > 0) {
+                         // Use variant inventory
+                         totalStock = product.variants.reduce((sum, variant) => {
+                           return sum + (variant.inventory?.quantity || 0);
+                         }, 0);
+                       } else {
+                         // Fallback to legacy inventory fields
+                         totalStock = product.stock || product.inventory?.quantity || product.quantity || 0;
+                       }
+                       
+                       return totalStock > 0 ? "In Stock" : "Out of Stock";
+                     })()}
+                   </Typography>
+                 </Box>
+               </CardContent>
             </Card>
           );
         })}
@@ -446,8 +535,8 @@ const TodaysDropsCarousel = () => {
         <Box sx={{
           display: "flex",
           justifyContent: "center",
-          mt: { xs: 4, md: 6 },
-          px: { xs: 1, sm: 2, md: 4 }
+          mt: { xs: 4, sm: 5, md: 6 },
+          px: { xs: 1, sm: 2, md: 2, lg: 3 }
         }}>
           <Button
             onClick={handleSeeMore}
@@ -498,8 +587,8 @@ const TodaysDropsCarousel = () => {
         <Box sx={{
           display: "flex",
           justifyContent: "center",
-          mt: { xs: 4, md: 6 },
-          px: { xs: 1, sm: 2, md: 4 }
+          mt: { xs: 4, sm: 5, md: 6 },
+          px: { xs: 1, sm: 2, md: 2, lg: 3 }
         }}>
           <Box sx={{
             backgroundColor: "#f8f9fa",
@@ -542,6 +631,13 @@ const TodaysDropsCarousel = () => {
           </Typography>
         </Box>
       )}
+
+      {/* Cart Selection Modal */}
+      <CartSelectionModal
+        open={cartModalOpen}
+        onClose={handleCartModalClose}
+        product={selectedProduct}
+      />
     </Box>
   );
 };

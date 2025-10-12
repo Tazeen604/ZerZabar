@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiService from '../../src/services/api';
-import { useSettings } from './SettingsContext';
 
 const NotificationContext = createContext();
 
@@ -16,7 +15,6 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const { getSetting } = useSettings();
 
   useEffect(() => {
     const interval = setInterval(() => {

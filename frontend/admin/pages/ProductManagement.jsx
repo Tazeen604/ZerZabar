@@ -114,6 +114,7 @@ const ProductManagement = () => {
     stock_quantity: '',
     category_id: '',
     subcategory_id: '',
+    collection: '',
     attributes: {},
     sizes: [],
     colors: [],
@@ -144,6 +145,7 @@ const ProductManagement = () => {
         page: page + 1,
       };
       console.log('Fetching products with params:', params);
+      console.log('Current token:', localStorage.getItem('admin_token'));
       const response = await apiService.getAdminProducts(params);
       console.log('Products response:', response);
       const productsData = response.data || [];
@@ -151,6 +153,7 @@ const ProductManagement = () => {
       setProducts(Array.isArray(productsData) ? productsData : []);
     } catch (err) {
       console.error('Error fetching products:', err);
+      console.error('Error details:', err.response?.data || err.message);
       setError(err.message);
       setProducts([]);
     } finally {
@@ -286,6 +289,7 @@ const ProductManagement = () => {
       stock_quantity: product.stock_quantity,
       category_id: categoryId,
       subcategory_id: subcategoryId,
+      collection: product.collection || '',
       attributes: product.attributes || {},
       sizes: product.sizes || [],
       colors: product.colors || [],
@@ -346,6 +350,9 @@ const ProductManagement = () => {
       formData.append('category_id', productForm.category_id);
       if (productForm.subcategory_id) {
         formData.append('subcategory_id', productForm.subcategory_id);
+      }
+      if (productForm.collection) {
+        formData.append('collection', productForm.collection);
       }
       formData.append('is_active', productForm.is_active ? '1' : '0');
       formData.append('is_featured', productForm.is_featured ? '1' : '0');
@@ -728,7 +735,7 @@ const ProductManagement = () => {
       <Paper sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab label="All Products" />
-          <Tab label="Inventory" />
+       
         </Tabs>
       </Paper>
 
@@ -853,11 +860,7 @@ const ProductManagement = () => {
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Tooltip title="View">
-                            <IconButton size="small">
-                              <Visibility />
-                            </IconButton>
-                          </Tooltip>
+                        
                           <Tooltip title="Edit">
                             <IconButton size="small" onClick={() => handleEditProduct(product)}>
                               <Edit />
@@ -1119,6 +1122,30 @@ const ProductManagement = () => {
                     </Box>
                   )}
                 </Box>
+              </FormControl>
+            </Grid>
+            
+            {/* Collection Selection */}
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth
+               variant="standard"
+               sx={{
+                 m: 1,
+                 minWidth: 200, // wider for full label visibility
+                 width: '100%',
+               }}>
+                <InputLabel>Collection (Optional)</InputLabel>
+                <Select
+                  value={productForm.collection}
+                  label="Collection (Optional)"
+                  onChange={(e) => handleFieldChange('collection', e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>No collection</em>
+                  </MenuItem>
+                  <MenuItem value="Winter">Winter Collection</MenuItem>
+                  <MenuItem value="Summer">Summer Collection</MenuItem>
+                </Select>
               </FormControl>
             </Grid>
             
@@ -1540,6 +1567,7 @@ const ProductManagement = () => {
               )}
             </Grid>
           </Grid>
+          
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenDialog(false)}>Cancel</Button>

@@ -32,16 +32,19 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import apiService from "../services/api";
 import Logo from "./Logo";
+import CartDrawer from "./CartDrawer";
 
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { getTotalItems } = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   
   // Check if current page is home page
   const isHomePage = location.pathname === '/';
   const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [shopMenuAnchor, setShopMenuAnchor] = useState(null);
   const [mobileShopExpanded, setMobileShopExpanded] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState(null);
@@ -63,14 +66,35 @@ const Navbar = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
+        setCategoriesLoading(true);
         const response = await apiService.getCategories();
         setCategories(response.data || []);
       } catch (error) {
         console.error("Error fetching categories:", error);
+        // Set empty array on error to prevent crashes
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
       }
     };
     fetchCategories();
   }, []);
+
+  // Refresh categories when location changes (user navigates)
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await apiService.getCategories();
+        setCategories(response.data || []);
+      } catch (error) {
+        console.error("Error refreshing categories:", error);
+      }
+    };
+    
+    // Small delay to ensure smooth navigation
+    const timeoutId = setTimeout(fetchCategories, 100);
+    return () => clearTimeout(timeoutId);
+  }, [location.pathname]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -123,7 +147,7 @@ const Navbar = () => {
 
   return (
     <Box>
-    <AppBar
+      <AppBar
       position="fixed"
       elevation={0}
       sx={{
@@ -149,18 +173,28 @@ const Navbar = () => {
           alignItems: "center",
           px: { xs: 2, md: 6 },
           width: "100%",
+          flexDirection: { xs: "row", md: "row" }
         }}
       >
         {/* Logo for non-home pages */}
         {!isHomePage && (
-          <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center" ,ml:4}}>
+          <Box sx={{ 
+            display: { xs: "none", md: "flex" }, 
+            alignItems: "center",
+            ml: 4,
+            order: 1
+          }}>
             <Logo size="medium" position="static" />
           </Box>
         )}
 
         {/* Mobile Logo for home page */}
         {isHomePage && (
-          <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center" }}>
+          <Box sx={{ 
+            display: { xs: "flex", md: "none" }, 
+            alignItems: "center",
+            order: 1
+          }}>
             <Logo size="small" position="static" />
           </Box>
         )}
@@ -174,6 +208,7 @@ const Navbar = () => {
             alignItems: "center",
             flexGrow: 1,
             ml: !isHomePage ? 2 : 6, // Add margin if logo is present
+            order: 2
           }}
         >
           {menuItems.map((item, index) => (
@@ -205,6 +240,7 @@ const Navbar = () => {
                     open={Boolean(shopMenuAnchor)}
                     onClose={() => setShopMenuAnchor(null)}
                     TransitionComponent={Fade}
+                    disableScrollLock={true}
                     MenuListProps={{
                       onMouseLeave: handleMegaMenuLeave,
                     }}
@@ -228,42 +264,15 @@ const Navbar = () => {
                         left:"50% ! important",
                         boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
                         p: 3, // Increased padding from 1 to 3
-                        position: "relative",
-                        maxHeight: "1200px", // Increased height from 1000px to 1200px
-                        overflow: "hidden",
-                        transform: "translateX(-50%) !important",
+                        position: "absolute",
+                        maxHeight: "80vh", // Use viewport height instead of fixed pixels
+                        overflow: "auto",
+                        zIndex: 1000, // Ensure it appears below navbar but above other content
+                        transform: "translateX(-50%) !important"
                       },
                     }}
                   >
-                    {/* Close Button */}
-                    <IconButton
-                      onClick={() => setShopMenuAnchor(null)}
-                      sx={{
-                        position: "absolute",
-                        top: 8,
-                        right: 8,
-                        color: "#fff",
-                        fontSize: "0.8rem",
-                        minWidth: "auto",
-                        width: "auto",
-                        height: "auto",
-                        padding: 0,
-                        backgroundColor: "transparent",
-                        borderRadius: 0,
-                        "&:hover": {
-                          color: "#FFD54F",
-                          backgroundColor: "transparent",
-                        },
-                        "&:focus": {
-                          backgroundColor: "transparent",
-                        },
-                        "&:active": {
-                          backgroundColor: "transparent",
-                        },
-                      }}
-                    >
-                      ×
-                    </IconButton>
+                    
                     <Box
                       sx={{
                         display: "grid",
@@ -273,7 +282,20 @@ const Navbar = () => {
                         pr: 1.5, // Add padding to account for close button
                       }}
                     >
-                      {megaMenuCategories.map((category, index) => (
+                      {categoriesLoading ? (
+                        <Box sx={{ gridColumn: "1 / -1", textAlign: "center", py: 2 }}>
+                          <Typography sx={{ color: "#fff", fontSize: "0.9rem" }}>
+                            Loading categories...
+                          </Typography>
+                        </Box>
+                      ) : megaMenuCategories.length === 0 ? (
+                        <Box sx={{ gridColumn: "1 / -1", textAlign: "center", py: 2 }}>
+                          <Typography sx={{ color: "#fff", fontSize: "0.9rem" }}>
+                            No categories available
+                          </Typography>
+                        </Box>
+                      ) : (
+                        megaMenuCategories.map((category, index) => (
                         <Box key={index} sx={{ minWidth: "100px" }}>
                           {/* Category Heading */}
                           <Typography
@@ -336,7 +358,8 @@ const Navbar = () => {
                             )}
                           </Box>
                         </Box>
-                      ))}
+                      ))
+                      )}
                     </Box>
                     
                     {/* View All Products Button */}
@@ -400,17 +423,15 @@ const Navbar = () => {
           ))}
         </Box>
 
-        {/* Mobile Navigation - Right Corner */}
+        {/* Mobile Navigation - Left Side (Hamburger) */}
         <Box sx={{ 
-          display: "flex", 
-          alignItems: "center", 
-          gap: { xs: 1, md: 2 },
-          ml: "auto", // Push to the right within navbar flow
+          display: { xs: "flex", md: "none" }, 
+          alignItems: "center",
+          order: 1
         }}>
           {/* Hamburger Menu (only on mobile) */}
           <IconButton
             sx={{ 
-              display: { xs: "flex", md: "none" }, 
               color: "white",
               "&:hover": { 
                 backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -422,10 +443,19 @@ const Navbar = () => {
           >
             <MenuIcon />
           </IconButton>
+        </Box>
 
+        {/* Mobile Navigation - Right Side (Cart) */}
+        <Box sx={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: { xs: 1, md: 2 },
+          ml: "auto", // Push to the right within navbar flow
+          order: 2
+        }}>
           {/* Cart Button */}
           <IconButton
-            onClick={() => navigate("/cart")}
+            onClick={() => setCartDrawerOpen(true)}
             sx={{
               backgroundColor: "#FFD700",
               color: "#000",
@@ -553,7 +583,34 @@ const Navbar = () => {
                             }}
                           />
                         </ListItem>
-                        {megaMenuCategories.map((category, index) => (
+                        {categoriesLoading ? (
+                          <ListItem>
+                            <ListItemText 
+                              primary="Loading categories..."
+                              sx={{ 
+                                "& .MuiListItemText-primary": { 
+                                  fontSize: "0.9rem", 
+                                  color: "#fff",
+                                  textAlign: "center"
+                                } 
+                              }}
+                            />
+                          </ListItem>
+                        ) : megaMenuCategories.length === 0 ? (
+                          <ListItem>
+                            <ListItemText 
+                              primary="No categories available"
+                              sx={{ 
+                                "& .MuiListItemText-primary": { 
+                                  fontSize: "0.9rem", 
+                                  color: "#fff",
+                                  textAlign: "center"
+                                } 
+                              }}
+                            />
+                          </ListItem>
+                        ) : (
+                          megaMenuCategories.map((category, index) => (
                           <Box key={index}>
                           <ListItem
                             button
@@ -604,7 +661,8 @@ const Navbar = () => {
                           </ListItem>
                             ))}
                           </Box>
-                        ))}
+                        ))
+                        )}
                       </List>
                     </AccordionDetails>
                   </Accordion>
@@ -654,23 +712,22 @@ const Navbar = () => {
           </List>
         </Box>
       </Drawer>
-    </AppBar>
+      </AppBar>
 
-    {/* Mobile Navigation - Only hamburger and cart */}
-    <Box sx={{
-      display: { xs: "flex", md: "none" },
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      zIndex: 1300,
-      backgroundColor: "transparent",
-      padding: 2,
-      justifyContent: "space-between",
-      alignItems: "center",
-    }}>
-      {/* Mobile Logo for home page */}
-      {isHomePage && (
+      {/* Mobile Navigation - Only hamburger and cart */}
+      <Box sx={{
+        display: { xs: "flex", md: "none" },
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1300,
+        backgroundColor: "transparent",
+        padding: 2,
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        {/* Mobile Logo for all pages */}
         <Box sx={{ 
           display: "flex", 
           alignItems: "center",
@@ -678,51 +735,56 @@ const Navbar = () => {
         }}>
           <Logo size="small" position="static" />
         </Box>
-      )}
 
-      {/* Mobile Navigation Buttons */}
-      <Box sx={{ 
-        display: "flex", 
-        alignItems: "center", 
-        gap: 1,
-      }}>
-        {/* Hamburger Menu */}
-        <IconButton
-          sx={{ 
-            color: "white",
-            backgroundColor: "rgba(0,0,0,0.3)",
-            backdropFilter: "blur(10px)",
-            "&:hover": { 
-              backgroundColor: "rgba(0,0,0,0.5)",
-              color: "#FFD54F"
-            },
-            transition: "all 0.3s ease",
-          }}
-          onClick={() => setDrawerOpen(true)}
-        >
-          <MenuIcon />
-        </IconButton>
+        {/* Mobile Navigation Buttons */}
+        <Box sx={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: 1,
+        }}>
+          {/* Hamburger Menu */}
+          <IconButton
+            sx={{ 
+              color: "white",
+              backgroundColor: "rgba(0,0,0,0.3)",
+              backdropFilter: "blur(10px)",
+              "&:hover": { 
+                backgroundColor: "rgba(0,0,0,0.5)",
+                color: "#FFD54F"
+              },
+              transition: "all 0.3s ease",
+            }}
+            onClick={() => setDrawerOpen(true)}
+          >
+            <MenuIcon />
+          </IconButton>
 
-        {/* Cart Button */}
-        <IconButton
-          onClick={() => navigate("/cart")}
-          sx={{
-            backgroundColor: "#FFD700",
-            color: "#000",
-            mr: 1, // add right margin away from edge
-            "&:hover": { 
-              backgroundColor: "#e6ac00",
-              transform: "scale(1.05)"
-            },
-            transition: "all 0.3s ease",
-          }}
-        >
-          <Badge badgeContent={getTotalItems()} color="error">
-            <ShoppingCartIcon />
-          </Badge>
-        </IconButton>
+          {/* Cart Button */}
+          <IconButton
+            onClick={() => setCartDrawerOpen(true)}
+            sx={{
+              backgroundColor: "#FFD700",
+              color: "#000",
+              mr: 1, // add right margin away from edge
+              "&:hover": { 
+                backgroundColor: "#e6ac00",
+                transform: "scale(1.05)"
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
+            <Badge badgeContent={getTotalItems()} color="error">
+              <ShoppingCartIcon />
+            </Badge>
+          </IconButton>
+        </Box>
       </Box>
-    </Box>
+
+      {/* Cart Drawer */}
+      <CartDrawer
+        open={cartDrawerOpen}
+        onClose={() => setCartDrawerOpen(false)}
+      />
     </Box>
   );
 };

@@ -48,6 +48,8 @@ class ApiService {
     const config = {
       ...options,
     };
+    
+    console.log('API Request:', { url, config, token: this.token });
 
     // Set headers based on whether it's FormData or not
     const isFormData = options.body instanceof FormData;

@@ -278,8 +278,9 @@ const TrendingCarousel = () => {
             <Box
               sx={{
                 position: "relative",
-                height: { xs: "180px", sm: "200px", md: "250px" },
+                height: { xs: "260px", sm: "200px", md: "250px" },
                 overflow: "hidden",
+             
               }}
             >
               <img
