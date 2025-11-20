@@ -26,7 +26,7 @@ import {
   Remove,
   ShoppingCart,
 } from "@mui/icons-material";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import { getImageUrl } from "../utils/imageUtils";
 import apiService from "../services/api";
 
@@ -49,7 +49,82 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
       setQuantity(cartItem.quantity || 1);
       loadProductVariants();
     }
-  }, [open, cartItem]);
+  }, [open, cartItem?.id]); // Only depend on cartItem.id to prevent unnecessary re-renders
+
+  // Set default size if no size is selected and variants are loaded
+  useEffect(() => {
+    if (productVariants?.sizes?.length && !selectedSize) {
+      setSelectedSize(productVariants.sizes[0]);
+    }
+  }, [productVariants, selectedSize]);
+
+  // Update price when size or color changes
+  useEffect(() => {
+    if (productVariants?.variants && selectedSize && selectedColor && cartItem) {
+      const selectedVariant = productVariants.variants.find(variant => 
+        variant.size === selectedSize && variant.color === selectedColor
+      );
+      
+      if (selectedVariant) {
+        const newPrice = parseFloat(selectedVariant.sale_price || selectedVariant.price || 0);
+        const newOriginalPrice = selectedVariant.sale_price ? parseFloat(selectedVariant.price) : null;
+        
+        // Only update if price or size/color actually changed
+        const priceChanged = newPrice !== cartItem.price;
+        const originalPriceChanged = newOriginalPrice !== cartItem.originalPrice;
+        const sizeChanged = selectedSize !== cartItem.size;
+        const colorChanged = selectedColor !== cartItem.color;
+        
+        if (priceChanged || originalPriceChanged || sizeChanged || colorChanged) {
+          // Update the cart item price in the parent component
+          if (onUpdate) {
+            onUpdate({
+              ...cartItem,
+              price: newPrice,
+              originalPrice: newOriginalPrice,
+              size: selectedSize,
+              color: selectedColor
+            });
+          }
+        }
+      }
+    }
+  }, [selectedSize, selectedColor, productVariants]); // Removed cartItem and onUpdate from dependencies
+
+  // Get available colors based on selected size
+  const getAvailableColors = () => {
+    if (!productVariants?.colors?.length) return [];
+    
+    // If we have variants and a size is selected, filter colors by size
+    if (productVariants?.variants?.length && selectedSize) {
+      const colorsForSize = productVariants.variants
+        .filter(variant => variant.size === selectedSize)
+        .map(variant => variant.color)
+        .filter(Boolean);
+      return [...new Set(colorsForSize)];
+    }
+    
+    // Fallback to all available colors
+    return productVariants?.colors || [];
+  };
+
+  // Handle size change with color filtering
+  const handleSizeChange = (size) => {
+    setSelectedSize(size);
+    
+    // If color is selected, check if it's available for the new size
+    if (selectedColor && productVariants?.variants?.length) {
+      const availableColorsForNewSize = productVariants.variants
+        ?.filter(variant => variant.size === size)
+        ?.map(variant => variant.color)
+        ?.filter(Boolean) || [];
+      
+      // If current color is not available for new size, clear it
+      if (!availableColorsForNewSize.includes(selectedColor)) {
+        setSelectedColor("");
+      }
+    }
+  };
 
   const loadProductVariants = async () => {
     if (!cartItem?.id) return;
@@ -72,8 +147,8 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
     setError(null);
     
     try {
-      console.log('Fetching product variants for ID:', cartItem.id);
-      const response = await apiService.getProduct(cartItem.id);
+      console.log('Fetching product variants for ID:', cartItem.productId);
+      const response = await apiService.getProduct(cartItem.productId);
       console.log('API response:', response);
       
       if (response && response.data) {
@@ -145,8 +220,35 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
     if (newQuantity < 1) {
       setQuantity(1);
     } else {
+      // Get stock from selected variant
+      const currentStock = getCurrentStock();
+      
+      if (currentStock === 0) {
+        setSnackbarMessage("This variant is out of stock");
+        setSnackbarOpen(true);
+        return;
+      }
+      if (newQuantity > currentStock) {
+        setSnackbarMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+        setSnackbarOpen(true);
+        return;
+      }
       setQuantity(newQuantity);
     }
+  };
+
+  const getCurrentStock = () => {
+    if (!cartItem || !productVariants || !productVariants.variants) return 0;
+    
+    // Find the specific variant based on selected size and color
+    const selectedVariant = productVariants.variants.find(variant => 
+      variant.size === selectedSize && variant.color === selectedColor
+    );
+    
+    if (!selectedVariant) return 0;
+    
+    // Return the variant's quantity directly
+    return selectedVariant.quantity || 0;
   };
 
   const handleUpdate = () => {
@@ -157,28 +259,37 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
     const colorChanged = selectedColor !== cartItem.color;
     
     if (sizeChanged || colorChanged) {
-      // Create new cart item with updated size/color
-      const updatedItem = {
-        ...cartItem,
-        size: selectedSize,
-        color: selectedColor,
-        quantity: quantity,
-        // Generate new cartId for the updated item
-        cartId: `${cartItem.id}-${selectedSize}-${selectedColor}-${Date.now()}`
+      // Replace the item by removing the old one first, then adding the selected variant
+      // Build a minimal product object for addToCart
+      const productForAdd = {
+        id: cartItem.productId,
+        name: cartItem.name,
+        variants: productVariants?.variants || []
       };
-      
-      // Remove old item and add new one
-      removeFromCart(cartItem.cartId);
-      
-      // Add the updated item to cart
-      addToCart(updatedItem);
-      
-      setSnackbarMessage("Cart item updated successfully!");
-      setSnackbarOpen(true);
-      
-      if (onUpdate) {
-        onUpdate(updatedItem);
+
+      // Find the selected variant exists
+      const selectedVariant = (productVariants?.variants || []).find(v => v.size === selectedSize && v.color === selectedColor);
+      if (!selectedVariant) {
+        setSnackbarMessage("Selected variant not available");
+        setSnackbarOpen(true);
+        return;
       }
+
+      // Remove the old item first
+      removeFromCart(cartItem.cartId).then(() => {
+        // Add the new variant
+        addToCart(productForAdd, selectedSize, selectedColor, quantity).then(() => {
+          setSnackbarMessage("Cart item updated successfully!");
+          setSnackbarOpen(true);
+          onClose();
+        }).catch(() => {
+          setSnackbarMessage("Failed to update cart item");
+          setSnackbarOpen(true);
+        });
+      }).catch(() => {
+        setSnackbarMessage("Failed to update cart item");
+        setSnackbarOpen(true);
+      });
     } else {
       // Only quantity changed, just update quantity
       updateQuantity(cartItem.cartId, quantity);
@@ -218,14 +329,23 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
       <Dialog
         open={open}
         onClose={onClose}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
-        fullScreen={{ xs: true, sm: false }}
+        fullScreen={false}
         PaperProps={{
           sx: { 
-            borderRadius: { xs: 0, sm: 2 },
-            m: { xs: 0, sm: 2 },
-            maxHeight: { xs: '100vh', sm: '90vh' }
+            borderRadius: { xs: 2, sm: 2 },
+            m: { xs: 2, sm: 2 },
+            maxHeight: { xs: '90vh', sm: '90vh' },
+            width: { xs: '100%', sm: 'auto' },
+            maxWidth: { xs: '100%', sm: '500px' },
+            mx: 'auto'
+          },
+          '& .MuiDialog-container': {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: { xs: 2, sm: 2 }
           }
         }}
       >
@@ -243,7 +363,12 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
           </IconButton>
         </DialogTitle>
         
-        <DialogContent>
+        <DialogContent sx={{ 
+          p: { xs: 2, sm: 3 },
+          '&.MuiDialogContent-root': {
+            paddingTop: { xs: 2, sm: 3 }
+          }
+        }}>
           {loading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <CircularProgress />
@@ -258,23 +383,6 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
           
           {!loading && !error && (
             <>
-            {/* Debug Info - Remove in production */}
-            {process.env.NODE_ENV === 'development' && productVariants && (
-              <Box sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Debug Info:
-                </Typography>
-                <Typography variant="body2">
-                  Sizes: {productVariants.sizes ? productVariants.sizes.join(', ') : 'None'}
-                </Typography>
-                <Typography variant="body2">
-                  Colors: {productVariants.colors ? productVariants.colors.join(', ') : 'None'}
-                </Typography>
-                <Typography variant="body2">
-                  Variants: {productVariants.variants ? productVariants.variants.length : 0} items
-                </Typography>
-              </Box>
-            )}
             
             <Box sx={{ 
               display: "flex", 
@@ -326,7 +434,7 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
                   <InputLabel sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}>Size</InputLabel>
                   <Select
                     value={selectedSize}
-                    onChange={(e) => setSelectedSize(e.target.value)}
+                    onChange={(e) => handleSizeChange(e.target.value)}
                     label="Size"
                     disabled={loading}
                     sx={{ 
@@ -346,30 +454,51 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
               )}
               
               {/* Color Selection */}
-              {productVariants?.colors && productVariants.colors.length > 0 && (
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}>Color</InputLabel>
-                  <Select
-                    value={selectedColor}
-                    onChange={(e) => setSelectedColor(e.target.value)}
-                    label="Color"
-                    disabled={loading}
-                    sx={{ 
-                      fontSize: { xs: "0.9rem", sm: "1rem" },
-                      "& .MuiSelect-select": {
-                        padding: { xs: "12px 14px", sm: "16px 14px" }
-                      }
-                    }}
-                  >
-                    {productVariants.colors.map((color) => (
-                      <MenuItem key={color} value={color} sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}>
+              {getAvailableColors().length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: { xs: "0.9rem", sm: "0.875rem" } }}>Color</Typography>
+                  <Stack direction="row" spacing={{ xs: 1, sm: 1, md: 2 }} flexWrap="wrap" rowGap={{ xs: 0.5, md: 1.5 }}>
+                    {getAvailableColors().map((color, idx) => (
+                      <Button
+                        key={idx} 
+                        variant={selectedColor === color ? "contained" : "outlined"}
+                        onClick={() => setSelectedColor(color)}
+                        disabled={loading}
+                        sx={{
+                          width: 65,
+                          minWidth: { xs: 35, sm: 45, md: 65 },
+                          height: { xs: 28, sm: 28, md: 28 },
+                          borderRadius: "18px",
+                          fontSize: { xs: "0.55rem", sm: "0.7rem" },
+                          backgroundColor: selectedColor === color ? "#000" : "transparent",
+                          color: selectedColor === color ? "#fff" : "#000",
+                          borderColor: "#000",
+                          marginBottom: { xs: 0.5, sm: 0 },
+                          "&:hover": {
+                            backgroundColor: selectedColor === color ? "#333" : "rgba(0,0,0,0.04)"
+                          }
+                        }}
+                      >
                         {color}
-                      </MenuItem>
+                      </Button>
                     ))}
-                  </Select>
-                </FormControl>
+                  </Stack>
+                </Box>
               )}
               
+              {/* Stock indicator */}
+              {selectedSize && selectedColor && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ 
+                    color: getCurrentStock() > 0 ? 'success.main' : 'error.main',
+                    fontSize: { xs: "0.85rem", sm: "0.875rem" },
+                    fontWeight: 500
+                  }}>
+                    {getCurrentStock() > 0 ? `${getCurrentStock()} items available` : 'Out of stock'}
+                  </Typography>
+                </Box>
+              )}
+
               {/* Quantity Selection */}
               <Box sx={{ mb: 2 }}>
                 <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, fontSize: { xs: "0.9rem", sm: "0.875rem" } }}>
@@ -459,10 +588,12 @@ const CartEditModal = ({ open, onClose, cartItem, onUpdate }) => {
         </DialogContent>
         
         <DialogActions sx={{ 
-          p: { xs: 2, sm: 3 }, 
+          p: { xs: 1, sm: 3 }, 
           pt: 0,
           flexDirection: { xs: "column", sm: "row" },
-          gap: { xs: 1, sm: 0 }
+          gap: { xs: 1, sm: 1 },
+          justifyContent: "center",
+          width: "100%"
         }}>
           <Button
             variant="outlined"

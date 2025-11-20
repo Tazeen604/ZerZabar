@@ -75,10 +75,10 @@ const Breadcrumbs = () => {
   return (
     <Box 
       sx={{ 
-        mt: { xs: 1.5, sm: 1.5 },
+        mt: { xs: 0.5, sm: 0.5 },
         py: { xs: 1.5, sm: 2 },
         px: { xs: 2, sm: 3, md: 4 },
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#FFD700',
         borderBottom: '1px solid #e9ecef'
       }}
     >
@@ -99,7 +99,7 @@ const Breadcrumbs = () => {
                 key={index}
                 variant="body2"
                 sx={{
-                  color: '#FFD700',
+                  color: '#000',
                   fontWeight: 500,
                   fontSize: { xs: '0.8rem', sm: '0.9rem' },
                   display: 'flex',
@@ -118,14 +118,14 @@ const Breadcrumbs = () => {
               component={RouterLink}
               to={item.path}
               sx={{
-                color: '#FFD700',
+                color: '#000',
                 textDecoration: 'none',
                 fontSize: { xs: '0.8rem', sm: '0.9rem' },
                 fontWeight: 400,
                 display: 'flex',
                 alignItems: 'center',
                 '&:hover': {
-                  color: '#0056b3',
+                  color: '#000',
                   textDecoration: 'underline'
                 }
               }}
@@ -141,3 +141,17 @@ const Breadcrumbs = () => {
 };
 
 export default Breadcrumbs;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

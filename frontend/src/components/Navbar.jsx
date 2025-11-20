@@ -29,7 +29,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchIcon from "@mui/icons-material/Search";
 import PersonIcon from "@mui/icons-material/Person";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import apiService from "../services/api";
 import Logo from "./Logo";
 import CartDrawer from "./CartDrawer";
@@ -37,7 +37,17 @@ import CartDrawer from "./CartDrawer";
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { getTotalItems } = useCart();
+  
+  // Safely use cart context with error handling
+  let cartTotals = { totalAmount: 0, itemCount: 0 };
+  try {
+    const cartContext = useCart();
+    cartTotals = cartContext.getCartTotals ? cartContext.getCartTotals() : { totalAmount: 0, itemCount: 0 };
+  } catch (error) {
+    console.warn('Cart context not available in Navbar:', error);
+    cartTotals = { totalAmount: 0, itemCount: 0 };
+  }
+  
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   
@@ -153,16 +163,16 @@ const Navbar = () => {
       sx={{
         left: "50%",
         transform: "translateX(-50%)",
-        top: isHomePage ? "80px" : "16px", // Position below logo on home, reduced margin on other pages
+        top: isHomePage ? "80px" : "15px", // Position below logo on home, reduced margin on other pages
         display: { xs: "none", md: "flex" }, // Hide navbar completely on mobile
         justifyContent: "center",
         alignItems: "center",
         width: { xs: "90%", md: "60%" }, // narrower on mobile
+        zIndex: 1200,
         borderRadius: "50px",
         background: isHomePage ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.6)", // More transparent on other pages
         backdropFilter: "blur(12px)", // glass effect
-        boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-        zIndex: 1200, // Lower than logo z-index
+        boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
       }}
     >
       <Toolbar
@@ -258,20 +268,21 @@ const Navbar = () => {
                         backdropFilter: "blur(12px)",
                         borderRadius: "5px",
                         border: "1px solid rgba(255,255,255,0.1)",
-                        mt: 1.5, // Reduced top margin to place exactly under navbar
-                        width: "63%", // Reduced by 2 points from 65%
-                        maxWidth: "730px", // Reduced by 2 points from 750px
+                        mt: 1.5,
+                        width: "63%",
+                        maxWidth: "730px",
                         left:"50% ! important",
                         boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-                        p: 3, // Increased padding from 1 to 3
+                        p: 3,
                         position: "absolute",
-                        maxHeight: "80vh", // Use viewport height instead of fixed pixels
+                        maxHeight: "80vh",
                         overflow: "auto",
-                        zIndex: 1000, // Ensure it appears below navbar but above other content
-                        transform: "translateX(-50%) !important"
+                        zIndex: 1000,
+                        transform: "translateX(-50%) !important",
                       },
                     }}
                   >
+                    
                     
                     <Box
                       sx={{
@@ -467,7 +478,7 @@ const Navbar = () => {
               transition: "all 0.3s ease",
             }}
           >
-            <Badge badgeContent={getTotalItems()} color="error">
+            <Badge badgeContent={cartTotals.itemCount} color="error">
               <ShoppingCartIcon />
             </Badge>
           </IconButton>
@@ -476,7 +487,7 @@ const Navbar = () => {
 
       {/* Drawer for Mobile */}
       <Drawer
-        anchor="right"
+        anchor="left"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         sx={{
@@ -521,16 +532,7 @@ const Navbar = () => {
                 e.target.nextSibling.style.display = "block";
               }}
             />
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: "bold",
-                color: "#333",
-                display: "none", // Hidden by default, shown if image fails
-              }}
-            >
-              Zer Zabar
-            </Typography>
+           
           </Box>
           
           <Typography
@@ -726,23 +728,14 @@ const Navbar = () => {
         padding: 2,
         justifyContent: "space-between",
         alignItems: "center",
+        height: "80px"
       }}>
-        {/* Mobile Logo for all pages */}
+        {/* Left: Hamburger Menu */}
         <Box sx={{ 
           display: "flex", 
           alignItems: "center",
-          ml: 2,
+          order: 1
         }}>
-          <Logo size="small" position="static" />
-        </Box>
-
-        {/* Mobile Navigation Buttons */}
-        <Box sx={{ 
-          display: "flex", 
-          alignItems: "center", 
-          gap: 1,
-        }}>
-          {/* Hamburger Menu */}
           <IconButton
             sx={{ 
               color: "white",
@@ -758,23 +751,44 @@ const Navbar = () => {
           >
             <MenuIcon />
           </IconButton>
+        </Box>
 
-          {/* Cart Button */}
+        {/* Center: Logo */}
+        <Box sx={{ 
+          display: "flex", 
+          alignItems: "center",
+          order: 2,
+          position: "absolute",
+          left: "50%",
+          transform: "translateX(-50%)"
+        }}>
+          <Logo size="small" position="static" />
+        </Box>
+
+        {/* Right: Cart Button */}
+        <Box sx={{ 
+          display: "flex", 
+          alignItems: "center",
+          order: 3
+        }}>
           <IconButton
             onClick={() => setCartDrawerOpen(true)}
+            size="small"
             sx={{
               backgroundColor: "#FFD700",
               color: "#000",
-              mr: 1, // add right margin away from edge
+              width: 36,
+              height: 36,
+              p: 0,
               "&:hover": { 
                 backgroundColor: "#e6ac00",
-                transform: "scale(1.05)"
+                transform: "scale(1.03)"
               },
               transition: "all 0.3s ease",
             }}
           >
-            <Badge badgeContent={getTotalItems()} color="error">
-              <ShoppingCartIcon />
+            <Badge badgeContent={cartTotals.itemCount} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.65rem', height: 16, minWidth: 16 } }}>
+              <ShoppingCartIcon fontSize="small" />
             </Badge>
           </IconButton>
         </Box>

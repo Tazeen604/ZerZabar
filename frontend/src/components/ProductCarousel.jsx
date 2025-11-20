@@ -20,9 +20,10 @@ import {
   FavoriteBorder
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import apiService from "../services/api";
 import { getProductImageUrl } from "../utils/imageUtils";
+import CartSelectionModal from "./CartSelectionModal";
 
 const ProductCarousel = () => {
   const [products, setProducts] = useState([]);
@@ -36,6 +37,8 @@ const ProductCarousel = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [wishlist, setWishlist] = useState(new Set());
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const intervalRef = useRef(null);
 
   // Responsive items per view
@@ -103,9 +106,13 @@ const ProductCarousel = () => {
 
   const handleAddToCart = (product, e) => {
     e.stopPropagation();
-    addToCart(product, 1);
-    setSnackbarMessage(`${product.name} added to cart`);
-    setSnackbarOpen(true);
+    setSelectedProduct(product);
+    setModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setSelectedProduct(null);
   };
 
   const handleQuickView = (product) => {
@@ -555,6 +562,13 @@ const ProductCarousel = () => {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Cart Selection Modal */}
+      <CartSelectionModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        product={selectedProduct}
+      />
     </Box>
   );
 };

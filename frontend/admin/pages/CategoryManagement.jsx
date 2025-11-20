@@ -42,10 +42,13 @@ import {
   Cancel,
   ExpandMore,
   ExpandLess,
+  CloudUpload,
+  Image,
 } from '@mui/icons-material';
 import apiService from '../../src/services/api';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import EmptyState from '../components/EmptyState';
+import { validateImageFile, formatFileSize, getCategoryImageUrl } from '../../src/utils/categoryUtils';
 
 const CategoryManagement = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -64,6 +67,7 @@ const CategoryManagement = () => {
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     description: '',
+    image: null,
     is_active: true,
     sort_order: 0,
   });
@@ -140,6 +144,16 @@ const CategoryManagement = () => {
       errors.name = 'Category name cannot exceed 255 characters';
     }
 
+    // Image validation
+    if (!editingItem && !categoryForm.image) {
+      errors.image = 'Category image is required';
+    } else if (categoryForm.image) {
+      const validation = validateImageFile(categoryForm.image);
+      if (!validation.isValid) {
+        errors.image = validation.error;
+      }
+    }
+
     // Description validation
     if (categoryForm.description && categoryForm.description.length > 1000) {
       errors.description = 'Description cannot exceed 1000 characters';
@@ -193,11 +207,46 @@ const CategoryManagement = () => {
 
     try {
       setLoading(true);
+      
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('name', categoryForm.name);
+      formData.append('description', categoryForm.description || '');
+      formData.append('is_active', categoryForm.is_active);
+      console.log('🔍 Frontend - is_active value:', categoryForm.is_active, 'type:', typeof categoryForm.is_active);
+      formData.append('sort_order', categoryForm.sort_order);
+      
+      if (categoryForm.image) {
+        formData.append('image', categoryForm.image);
+        console.log('🔍 Frontend - Image file being sent:', {
+          name: categoryForm.image.name,
+          size: categoryForm.image.size,
+          type: categoryForm.image.type
+        });
+      } else {
+        console.log('🔍 Frontend - No image file in form data');
+      }
+
+      console.log('🔍 Frontend - FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(key, ':', value, '(type:', typeof value, ')');
+      }
+
       if (editingItem) {
-        await apiService.put(`/admin/categories/${editingItem.id}`, categoryForm);
+        console.log('🔍 Frontend - Updating category:', editingItem.id);
+        await apiService.post(`/admin/categories/${editingItem.id}/update`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
         setSuccess('Category updated successfully');
       } else {
-        await apiService.post('/admin/categories', categoryForm);
+        console.log('🔍 Frontend - Creating new category');
+        await apiService.post('/admin/categories', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
         setSuccess('Category created successfully');
       }
       
@@ -304,11 +353,13 @@ const CategoryManagement = () => {
       setCategoryForm(item ? {
         name: item.name,
         description: item.description || '',
+        image: null, // Reset image for editing
         is_active: item.is_active,
         sort_order: item.sort_order || 0,
       } : {
         name: '',
         description: '',
+        image: null,
         is_active: true,
         sort_order: 0,
       });
@@ -624,6 +675,117 @@ const CategoryManagement = () => {
               error={!!validationErrors.description}
               helperText={validationErrors.description}
             />
+                </Grid>
+                <Grid item xs={12}>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                      Category Image {!editingItem && <span style={{ color: 'red' }}>*</span>}
+                    </Typography>
+                    <input
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      id="category-image-upload"
+                      type="file"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const validation = validateImageFile(file);
+                          if (!validation.isValid) {
+                            setValidationErrors(prev => ({
+                              ...prev,
+                              image: validation.error
+                            }));
+                            return;
+                          }
+                          setCategoryForm({ ...categoryForm, image: file });
+                          setValidationErrors(prev => ({
+                            ...prev,
+                            image: ''
+                          }));
+                        }
+                      }}
+                    />
+                    <label htmlFor="category-image-upload">
+                      <Button
+                        variant="outlined"
+                        component="span"
+                        startIcon={<CloudUpload />}
+                        sx={{
+                          border: '2px dashed #ccc',
+                          borderRadius: 2,
+                          p: 2,
+                          width: '100%',
+                          textTransform: 'none',
+                          '&:hover': {
+                            borderColor: '#FFD700',
+                            backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                          }
+                        }}
+                      >
+                        {categoryForm.image ? 'Change Image' : 'Upload Category Image'}
+                      </Button>
+                    </label>
+                    {/* Show existing image preview when editing */}
+                    {editingItem && editingItem.image && !categoryForm.image && (
+                      <Box sx={{ mt: 2, mb: 2 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                          Current Image:
+                        </Typography>
+                        <Box
+                          component="img"
+                          src={getCategoryImageUrl(editingItem.image)}
+                          alt={editingItem.name}
+                          sx={{
+                            width: '100%',
+                            maxWidth: 300,
+                            maxHeight: 200,
+                            objectFit: 'contain',
+                            borderRadius: 2,
+                            border: '1px solid #e0e0e0',
+                            backgroundColor: '#f5f5f5',
+                            p: 1
+                          }}
+                          onError={(e) => {
+                            console.error('Failed to load category image:', editingItem.image);
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </Box>
+                    )}
+                    {/* Show new file preview when a new file is selected */}
+                    {categoryForm.image && (
+                      <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Image sx={{ color: '#4CAF50' }} />
+                        <Typography variant="body2" color="success.main">
+                          {categoryForm.image.name} ({formatFileSize(categoryForm.image.size)})
+                        </Typography>
+                        {categoryForm.image instanceof File && (
+                          <Box
+                            component="img"
+                            src={URL.createObjectURL(categoryForm.image)}
+                            alt="Preview"
+                            sx={{
+                              width: 100,
+                              height: 100,
+                              objectFit: 'cover',
+                              borderRadius: 1,
+                              border: '1px solid #e0e0e0'
+                            }}
+                          />
+                        )}
+                      </Box>
+                    )}
+                    {editingItem && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        Leave empty to keep current image
+                      </Typography>
+                    )}
+                    {validationErrors.image && (
+                      <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                        {validationErrors.image}
+                      </Typography>
+                    )}
+                  </Box>
                 </Grid>
                 <Grid item xs={6}>
                   <TextField

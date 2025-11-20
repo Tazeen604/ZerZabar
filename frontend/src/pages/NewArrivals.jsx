@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Container,
@@ -19,15 +19,17 @@ import {
   Pagination,
 } from "@mui/material";
 import Breadcrumbs from "../components/Breadcrumbs";
+import PageHeaderWithSettings from "../components/PageHeaderWithSettings";
 import { Search, FilterList, ShoppingCart, Visibility, NewReleases } from "@mui/icons-material";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import apiService from "../services/api";
 import Footer from "../components/Footer";
 import { getProductImageUrl } from "../utils/imageUtils";
 import FilterMegaPanel from "../components/FilterMegaPanel";
 import ProductCard from "../components/ProductCard";
 import CartDrawer from "../components/CartDrawer";
+import CategoryCarousel from "../components/CategoryCarousel";
 
 const NewArrivals = () => {
   const [products, setProducts] = useState([]);
@@ -76,6 +78,9 @@ const NewArrivals = () => {
     }
     if (collectionFromUrl) {
       setSelectedCollection(collectionFromUrl);
+      setSelectedCollections([collectionFromUrl]);
+    } else {
+      setSelectedCollections([]);
     }
   }, [searchParams]);
 
@@ -84,7 +89,7 @@ const NewArrivals = () => {
   useEffect(() => {
     fetchSettings();
     fetchData();
-  }, [searchTerm, selectedCategory, selectedCollection, sortBy, sortOrder, currentPage]);
+  }, [searchTerm, selectedCategory, sortBy, sortOrder, currentPage]);
 
   const fetchSettings = async () => {
     try {
@@ -107,7 +112,6 @@ const NewArrivals = () => {
       const productsResponse = await apiService.getNewArrivals({
         search: searchTerm,
         category_id: selectedCategory,
-        collection: selectedCollection,
         sort_by: sortBy,
         sort_order: sortOrder,
         page: currentPage,
@@ -125,13 +129,10 @@ const NewArrivals = () => {
 
       // Fetch categories for filtering
       const categoriesResponse = await apiService.getCategories();
-      console.log('Categories response:', categoriesResponse);
       
-      if (categoriesResponse.data) {
-        setCategories(categoriesResponse.data || []);
-      } else {
-        setCategories([]);
-      }
+      // The backend returns { success: true, data: [...], message: "..." }
+      const categoriesData = categoriesResponse.data;
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
 
       setIsInitialLoad(false);
     } catch (err) {
@@ -152,6 +153,12 @@ const NewArrivals = () => {
   const handleCategoryChange = (event) => {
     setSelectedCategory(event.target.value);
     setCurrentPage(1); // Reset to first page when filtering
+  };
+
+  const handleCategoryCarouselSelect = (categoryId, categoryName) => {
+    console.log('Category carousel selected:', categoryId, categoryName);
+    setSelectedCategory(categoryId);
+    setCurrentPage(1);
   };
 
   const handleSortChange = (event) => {
@@ -240,8 +247,9 @@ const NewArrivals = () => {
   };
 
   const applyPanel = () => {
+    // Sync single selected collection from panel to main collection filter
+    setSelectedCollection(selectedCollections[0] || "");
     setPanelOpen(false);
-    // Filters are already applied through state changes
   };
 
   // Handle "See More" button click
@@ -292,21 +300,40 @@ const NewArrivals = () => {
   };
 
   // Derive filter options from products
-  const derivedSizes = Array.from(new Set(
-    products.flatMap(product => product.sizes || [])
-  )).sort();
+  const derivedSizes = Array.from(new Set(products.flatMap(p => 
+    Array.isArray(p.variants) ? p.variants.map(v => v.size).filter(Boolean) : []
+  )));
 
-  const derivedColors = Array.from(new Set(
-    products.flatMap(product => product.colors || [])
-  )).map(color => ({
-    value: color,
-    label: color,
-    hex: '#000000' // Default color, could be enhanced with actual color mapping
-  }));
+  const derivedColors = Array.from(new Set(products.flatMap(p => 
+    Array.isArray(p.variants) ? p.variants.map(v => v.color).filter(Boolean) : []
+  ))).map(c => ({ value: c, label: c }));
+
+  // Client-side filtering for sizes, colors, and collections
+  const filteredProducts = useMemo(() => {
+    let list = products || [];
+    if (selectedColors.length) {
+      list = list.filter(p => {
+        const colors = Array.isArray(p.variants) ? p.variants.map(v => v.color).filter(Boolean) : [];
+        return colors.some(c => selectedColors.includes(c));
+      });
+    }
+    if (selectedSizes.length) {
+      list = list.filter(p => {
+        const sizes = Array.isArray(p.variants) ? p.variants.map(v => v.size).filter(Boolean) : [];
+        return sizes.some(s => selectedSizes.includes(s));
+      });
+    }
+    if (selectedCollections.length) {
+      list = list.filter(p => {
+        return selectedCollections.includes(p.collection);
+      });
+    }
+    return list;
+  }, [products, selectedColors, selectedSizes, selectedCollections]);
 
   if (loading && isInitialLoad) {
     return (
-      <Box sx={{ pt: { xs: 10, md: 16 }, minHeight: '100vh' }}>
+      <Box sx={{ pt: { xs: 10, md: 16 }, minHeight: 'calc(100vh - 120px)' }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
           <CircularProgress size={60} sx={{ color: '#FFD700' }} />
         </Box>
@@ -316,47 +343,39 @@ const NewArrivals = () => {
 
   return (
     <Box sx={{ 
-      pt: { xs: 10, md: 16 }, 
-      minHeight: '100vh',
+      pt: 0, 
+      minHeight: 'calc(100vh - 120px)',
       backgroundColor: '#fff'
     }}>
-      <Breadcrumbs />
+      <PageHeaderWithSettings title="New Arrivals" breadcrumb="Home / New Arrivals" defaultBgImage="/images/new-arrival.jpg" />
       <Container 
         maxWidth="xl"
         sx={{ 
-          maxWidth: '1280px !important', // Increased width for 4 cards
+          maxWidth: '100% !important', // Full width for maximum card size
           mx: 'auto',
-          px: { xs: 1, sm: 2, md: 2 }, // Reduced padding for 4 cards
-          py: 4
+          px: { xs: 0, sm: 1, md: 1, lg: 1.5, xl: 2 }, // Reduced desktop padding
+          py: { xs: 0.5, sm: 2, md: 2, lg: 2, xl: 2 } // Reduced mobile padding
         }}
       >
-        {/* Header Section */}
-        <Box sx={{ mb: 4, textAlign: 'center' }}>
-          <Typography 
-            variant="h2" 
-            component="h1" 
-            sx={{ 
-              fontWeight: 'bold', 
-              mb: 2,
-              background: 'linear-gradient(45deg,rgb(0, 0, 0),rgb(8, 8, 8))',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            New Arrivals
-          </Typography>
-         
-        </Box>
-          
+
+      {/* Category Carousel */}
+      <Box sx={{ mb: 1, py: 1,   px: { xs: 1, sm: 2, md: 4 } }}>
+        <CategoryCarousel
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onCategorySelect={handleCategoryCarouselSelect}
+          showViewAll={true}
+          maxVisible={6}
+          showNavigation={true}
+        />
+      </Box>
+
       {/* Filters */}
       <Box sx={{ 
         mb: 3, 
-        py: { xs: 2, md: 2 }, 
+        py: { xs: 1, md: 1 }, 
         borderBottom: '1px solid #f0f0f0',
-        backgroundColor: '#fafafa',
-        borderRadius: { xs: 0, md: 1 },
-        px: { xs: 2, md: 3 }
+        px: { xs: 0.5, sm: 1, md: 0.75, lg: 1, xl: 1.25 }
       }}>
         {/* Mobile Layout */}
         <Box sx={{ 
@@ -391,108 +410,33 @@ const NewArrivals = () => {
 
           {/* Filter Row - Mobile */}
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
-            <FormControl size="small" sx={{ flex: 1, minWidth: '120px' }}>
-              <InputLabel 
-                shrink={true}
-                sx={{ 
-                  fontSize: '0.9rem',
-                  color: '#666',
-                  '&.Mui-focused': {
-                    color: '#FFD700',
-                  }
-                }}
-              >Category</InputLabel>
-              <Select
-                value={selectedCategory}
-                onChange={handleCategoryChange}
-                label="Category"
-                displayEmpty
-                sx={{ 
-                  fontSize: '0.9rem',
-                  borderRadius: '8px',
-                  backgroundColor: '#fff',
-                  '&:hover': {
-                    borderColor: '#FFD700',
-                  },
-                  '&.Mui-focused': {
-                    borderColor: '#FFD700',
-                    boxShadow: '0 0 0 2px rgba(255, 215, 0, 0.2)',
-                  }
-                }}
-              >
-                <MenuItem value="" sx={{ fontSize: '0.9rem' }}>All Categories</MenuItem>
-                {categories.map((category) => (
-                  <MenuItem key={category.id} value={category.id} sx={{ fontSize: '0.9rem' }}>
-                    {category.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl size="small" sx={{ flex: 1, minWidth: '120px' }}>
-              <InputLabel 
-                shrink={true}
-                sx={{ 
-                  fontSize: '0.9rem',
-                  color: '#666',
-                  '&.Mui-focused': {
-                    color: '#FFD700',
-                  }
-                }}
-              >Collection</InputLabel>
-              <Select
-                value={selectedCollection}
-                onChange={handleCollectionChange}
-                label="Collection"
-                displayEmpty
-                sx={{ 
-                  fontSize: '0.9rem',
-                  borderRadius: '8px',
-                  backgroundColor: '#fff',
-                  '&:hover': {
-                    borderColor: '#FFD700',
-                  },
-                  '&.Mui-focused': {
-                    borderColor: '#FFD700',
-                    boxShadow: '0 0 0 2px rgba(255, 215, 0, 0.2)',
-                  }
-                }}
-              >
-                <MenuItem value="" sx={{ fontSize: '0.9rem' }}>All Collections</MenuItem>
-                <MenuItem value="Winter" sx={{ fontSize: '0.9rem' }}>Winter Collection</MenuItem>
-                <MenuItem value="Summer" sx={{ fontSize: '0.9rem' }}>Summer Collection</MenuItem>
-              </Select>
-            </FormControl>
-
-           
+            {/* Collection moved to Filter Mega Panel */}
 
             <Button
-              variant="outlined"
+              variant="text"
               onClick={() => setPanelOpen(true)}
               startIcon={<FilterList />}
               sx={{ 
                 minWidth: 'auto',
-                px: 2,
-                borderColor: '#ddd',
+                px: 0,
                 color: '#666',
+                textTransform: 'none',
                 '&:hover': {
-                  borderColor: '#000',
-                  color: '#000'
+                  color: '#FFD700',
+                  backgroundColor: 'transparent'
                 }
               }}
             >
               Filter
             </Button>
-          </Box>
 
-          {/* Clear Button - Mobile */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
             <Button
               variant="text"
               onClick={() => {
                 setSearchTerm("");
                 setSelectedCategory("");
                 setSelectedCollection("");
+                setSelectedCollections([]);
                 setSortBy("created_at");
                 setCurrentPage(1);
               }}
@@ -500,25 +444,27 @@ const NewArrivals = () => {
                 fontSize: '0.85rem',
                 color: '#666',
                 textTransform: 'none',
-                px: 2,
+                px: 0,
                 py: 0.5,
                 '&:hover': {
-                  backgroundColor: 'rgba(0,0,0,0.04)',
+                  color: '#FFD700',
+                  backgroundColor: 'transparent'
                 }
               }}
             >
-              Clear all filters
+              Clear all 
             </Button>
           </Box>
+          
         </Box>
-      </Box>
 
         {/* Desktop Layout */}
           <Box sx={{ 
           display: { xs: 'none', md: 'flex' }, 
             gap: 2, 
           alignItems: 'center', 
-          justifyContent: 'space-between' 
+          justifyContent: 'space-between' ,
+          mt:0,
         }}>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flex: 1 }}>
             <TextField
@@ -546,127 +492,66 @@ const NewArrivals = () => {
               }}
             />
 
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel 
-                shrink={true}
-                sx={{ 
-                  fontSize: '0.9rem',
-                  color: '#666',
-                  '&.Mui-focused': {
-                    color: '#FFD700',
-                  }
-                }}
-              >Category</InputLabel>
-              <Select
-                value={selectedCategory}
-                onChange={handleCategoryChange}
-                label="Category"
-                displayEmpty
-                sx={{ 
-                  fontSize: '0.9rem',
-                  borderRadius: '8px',
-                  backgroundColor: '#fff',
-                  '&:hover': {
-                    borderColor: '#FFD700',
-                  },
-                  '&.Mui-focused': {
-                    borderColor: '#FFD700',
-                    boxShadow: '0 0 0 2px rgba(255, 215, 0, 0.2)',
-                  }
-                }}
-              >
-                <MenuItem value="" sx={{ fontSize: '0.9rem' }}>All Categories</MenuItem>
-                {categories.map((category) => (
-                  <MenuItem key={category.id} value={category.id} sx={{ fontSize: '0.9rem' }}>
-                    {category.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel 
-                shrink={true}
-                sx={{ 
-                  fontSize: '0.9rem',
-                  color: '#666',
-                  '&.Mui-focused': {
-                    color: '#FFD700',
-                  }
-                }}
-              >Collection</InputLabel>
-              <Select
-                value={selectedCollection}
-                onChange={handleCollectionChange}
-                label="Collection"
-                displayEmpty
-                sx={{ 
-                  fontSize: '0.9rem',
-                  borderRadius: '8px',
-                  backgroundColor: '#fff',
-                  '&:hover': {
-                    borderColor: '#FFD700',
-                  },
-                  '&.Mui-focused': {
-                    borderColor: '#FFD700',
-                    boxShadow: '0 0 0 2px rgba(255, 215, 0, 0.2)',
-                  }
-                }}
-              >
-                <MenuItem value="" sx={{ fontSize: '0.9rem' }}>All Collections</MenuItem>
-                <MenuItem value="Winter" sx={{ fontSize: '0.9rem' }}>Winter Collection</MenuItem>
-                <MenuItem value="Summer" sx={{ fontSize: '0.9rem' }}>Summer Collection</MenuItem>
-              </Select>
-            </FormControl>
+            {/* Collection moved to Filter Mega Panel */}
 
            
           </Box>
 
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <Button
-              variant="outlined"
+              variant="text"
               onClick={() => setPanelOpen(true)}
               startIcon={<FilterList />}
               sx={{ 
                 minWidth: 'auto',
-                px: 2,
-                borderColor: '#ddd',
+                px: 0,
                 color: '#666',
+                textTransform: 'none',
                 '&:hover': {
-                  borderColor: '#000',
-                  color: '#000'
+                  color: '#FFD700',
+                  backgroundColor: 'transparent'
                 }
               }}
             >
               Filter
             </Button>
 
-          <Button
-            variant="text"
-            onClick={() => {
-              setSearchTerm("");
-              setSelectedCategory("");
-              setSelectedCollection("");
-              setSortBy("created_at");
-              setCurrentPage(1);
-            }}
-            sx={{
-              fontSize: '0.9rem',
-              color: '#666',
-              textTransform: 'none',
-              px: 2,
-              py: 1,
-              borderRadius: '8px',
-              '&:hover': {
-                backgroundColor: 'rgba(0,0,0,0.04)',
-              }
-            }}
-          >
-            Clear all filters
-          </Button>
+            <Button
+              variant="text"
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedCategory("");
+                setSelectedCollection("");
+                setSelectedCollections([]);
+                setSortBy("created_at");
+                setCurrentPage(1);
+              }}
+              sx={{
+                fontSize: '0.9rem',
+                color: '#666',
+                textTransform: 'none',
+                px: 0,
+                py: 1,
+                borderRadius: 0,
+                '&:hover': {
+                  color: '#FFD700',
+                  backgroundColor: 'transparent'
+                }
+              }}
+            >
+              Clear all
+            </Button>
           </Box>
         </Box>
-
+      </Box>
+{/* Product Count */}
+{!loading && !isInitialLoad && Array.isArray(filteredProducts) && (
+        <Box sx={{ mb: 2, mt:2,display: 'flex', justifyContent: 'flex-start', alignItems: 'center', px: { xs: 1, sm: 2, md: 4 } }}>
+          <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
+            {(filteredProducts?.length || 0)} {(filteredProducts?.length || 0) === 1 ? 'product' : 'products'}
+          </Typography>
+        </Box>
+      )}
         {/* Error State */}
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -679,7 +564,7 @@ const NewArrivals = () => {
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
             <CircularProgress size={60} sx={{ color: '#FFD700' }} />
           </Box>
-        ) : products.length === 0 ? (
+        ) : filteredProducts.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <NewReleases sx={{ fontSize: 80, color: '#ccc', mb: 2 }} />
             <Typography variant="h5" color="text.secondary" sx={{ mb: 2 }}>
@@ -700,15 +585,18 @@ const NewArrivals = () => {
                 gridTemplateColumns: {
                   xs: "repeat(2, 1fr)",
                   sm: "repeat(2, 1fr)",
-                  md: "repeat(3, 1fr)",
+                  md: "repeat(4, 1fr)",
                   lg: "repeat(4, 1fr)",
+                  xl: "repeat(4, 1fr)",
                 },
-                gap: { xs: 1, sm: 2, md: 3 },
-                px: { xs: 1, sm: 2, md: 4 },
+                gap: { xs: 0.1, sm: 0.75, md: 1, lg: 1.5, xl: 1.5 },
+                px: { xs: 0, sm: 0.5, md: 1, lg: 1.5, xl: 2 },
                 justifyContent: "center",
+                maxWidth: { xs: "100%", sm: "100%", md: "1200px", lg: "1400px", xl: "1600px" },
+                mx: "auto",
               }}
             >
-              {products.slice(0, visibleCount).map((product) => (
+              {filteredProducts.slice(0, visibleCount).map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}
@@ -719,19 +607,19 @@ const NewArrivals = () => {
                   showQuickView={true}
                   showAddToCart={true}
                   showStock={true}
-                  cardHeight="470px"
+                  cardHeight="auto"
                   imageHeight="250px"
                 />
               ))}
                       </Box>
 
             {/* See More Button */}
-            {products.length > visibleCount && (
+            {filteredProducts.length > visibleCount && (
               <Box sx={{
                 display: "flex",
                 justifyContent: "center",
-                mt: { xs: 4, md: 6 },
-                px: { xs: 1, sm: 2, md: 4 }
+                mt: { xs: 2, md: 6 },
+                px: { xs: 0, sm: 1, md: 0.75, lg: 1, xl: 1.25 }
               }}>
                         <Button
                   onClick={handleSeeMore}
@@ -769,7 +657,7 @@ const NewArrivals = () => {
                       <span>Loading...</span>
                     </Box>
                   ) : (
-                    `View More (${products.length - visibleCount} left)`
+                    `View More (${filteredProducts.length - visibleCount} left)`
                   )}
                 </Button>
               </Box>
@@ -818,7 +706,7 @@ const NewArrivals = () => {
         onClose={() => setPanelOpen(false)}
         sizes={derivedSizes}
         colors={derivedColors}
-        collections={[]}
+        collections={["Winter", "Summer", "All Season"]}
         sortValue={getSortDisplayValue()}
         onSortChange={(v) => { handleSortChange({ target: { value: v } }); }}
         selectedSizes={selectedSizes}

@@ -16,10 +16,7 @@ import {
   Chip,
   Avatar,
   TablePagination,
-  Menu,
   MenuItem,
-  ListItemIcon,
-  ListItemText,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -45,12 +42,14 @@ import {
   Inventory as InventoryIcon,
   TrendingUp,
   TrendingDown,
+  Visibility,
+  Close,
 } from '@mui/icons-material';
 import apiService from '../../src/services/api';
 import { useSettings } from '../contexts/SettingsContext';
 
 const Inventory = () => {
-  const { getSetting, getStockStatus, refreshSettings } = useSettings();
+  const { getSetting, getStockStatus, refreshSettings, loading: settingsLoading } = useSettings();
   const [inventoryData, setInventoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,23 +57,49 @@ const Inventory = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editQuantity, setEditQuantity] = useState(0);
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
+  const [availableColors, setAvailableColors] = useState([]);
+  const [availableSizes, setAvailableSizes] = useState([]);
+  const [variantsModalOpen, setVariantsModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
   useEffect(() => {
-    // Refresh settings first to ensure we have latest threshold values
-    refreshSettings().then(() => {
-      console.log('Settings refreshed, current threshold:', getSetting('low_stock_threshold', 10));
+    // Only run once on mount - don't refresh settings if they're already loaded
+    // This prevents infinite loops
+    if (!hasInitiallyLoaded) {
+      // Wait for settings to be loaded before proceeding
+      if (settingsLoading) {
+        return;
+      }
+
+      // Settings are already loaded, just fetch inventory data
+      console.log('Settings loaded, current threshold:', getSetting('low_stock_threshold', 10));
       fetchInventoryData();
       fetchCategories();
-    });
-  }, []);
+      setHasInitiallyLoaded(true); // Mark initial load complete
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsLoading, hasInitiallyLoaded]);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
+
+  // Refetch data when filters change (only after initial load)
+  useEffect(() => {
+    if (hasInitiallyLoaded) {
+      fetchInventoryData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, selectedSubcategory, selectedColor, selectedSize, filterStatus, searchTerm]);
 
   const fetchInventoryData = async () => {
     try {
@@ -82,14 +107,32 @@ const Inventory = () => {
       const params = new URLSearchParams();
       if (selectedCategory) params.append('category_id', selectedCategory);
       if (selectedSubcategory) params.append('subcategory_id', selectedSubcategory);
+      if (selectedColor) params.append('color', selectedColor);
+      if (selectedSize) params.append('size', selectedSize);
       if (filterStatus !== 'all') params.append('stock_status', filterStatus);
-      if (searchTerm) params.append('search', searchTerm);
+      if (searchTerm && searchTerm.trim()) params.append('search', searchTerm.trim());
       
       const response = await apiService.get(`/admin/inventory?${params.toString()}`);
       
       if (response.success) {
         const data = response.data?.data || response.data || [];
         setInventoryData(data);
+        
+        // Extract unique colors and sizes from the data
+        const colors = new Set();
+        const sizes = new Set();
+        
+        data.forEach(product => {
+          if (product.available_colors) {
+            product.available_colors.forEach(color => colors.add(color));
+          }
+          if (product.available_sizes) {
+            product.available_sizes.forEach(size => sizes.add(size));
+          }
+        });
+        
+        setAvailableColors(Array.from(colors).sort());
+        setAvailableSizes(Array.from(sizes).sort());
       } else {
         setError(response.message || 'Failed to fetch inventory data');
       }
@@ -111,61 +154,29 @@ const Inventory = () => {
     }
   };
 
-  const handleAdjustStock = (product) => {
-    setSelectedItem(product);
-    setEditQuantity(product.total_quantity || 0);
-    setEditDialogOpen(true);
+
+  const getComputedTotal = (product) => {
+    // Use the total_quantity calculated by backend (sum of all variant original quantities)
+    return typeof product.total_quantity !== 'undefined' ? Number(product.total_quantity) || 0 : 0;
   };
 
-  const handleEditQuantity = (item) => {
-    setSelectedItem(item);
-    setEditQuantity(item.inventory?.quantity || 0);
-    setEditDialogOpen(true);
-  };
-
-  const handleSaveQuantity = async () => {
-    try {
-      console.log('Adjusting stock for product:', selectedItem);
-      console.log('Product ID:', selectedItem.id);
-      console.log('New quantity:', editQuantity);
-      
-      const response = await apiService.put(`/admin/inventory/${selectedItem.id}/stock`, {
-        quantity: editQuantity,
-        notes: 'Manual adjustment'
-      });
-
-      console.log('API Response:', response);
-
-      if (response.success) {
-        setEditDialogOpen(false);
-        setSelectedItem(null);
-        setEditQuantity(0);
-        // Force refresh with a small delay to ensure backend has processed
-        setTimeout(() => {
-          fetchInventoryData();
-        }, 500);
-        console.log('Stock adjustment successful, refreshing data...');
-      } else {
-        console.error('API Error:', response);
-        setError(response.message || 'Failed to update quantity');
-      }
-    } catch (err) {
-      console.error('Error adjusting stock:', err);
-      setError(err.message || 'Failed to update quantity');
-    }
+  const getComputedAvailable = (product) => {
+    // Use the available_quantity calculated by backend (sum of all variant available stock)
+    return typeof product.available_quantity !== 'undefined' ? Number(product.available_quantity) || 0 : 0;
   };
 
   const filteredData = inventoryData.filter(product => {
-    const totalQuantity = product.total_quantity || 0;
-    const matchesSearch = product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.product_id?.toLowerCase().includes(searchTerm.toLowerCase());
+    const availableQuantity = getComputedAvailable(product);
+    const q = (searchTerm || '').trim().toLowerCase();
+    const matchesSearch = q === '' ||
+                         product.name?.toLowerCase().includes(q) ||
+                         product.product_id?.toLowerCase().includes(q);
     
     let matchesFilter = true;
     if (filterStatus === 'low') {
-      matchesFilter = getStockStatus(totalQuantity).status === 'low_stock';
+      matchesFilter = getStockStatus(availableQuantity).status === 'low_stock';
     } else if (filterStatus === 'out') {
-      matchesFilter = getStockStatus(totalQuantity).status === 'out_of_stock';
+      matchesFilter = getStockStatus(availableQuantity).status === 'out_of_stock';
     }
     
     return matchesSearch && matchesFilter;
@@ -174,14 +185,28 @@ const Inventory = () => {
 
   const getTotalValue = () => {
     return inventoryData.reduce((total, product) => {
-      const totalQuantity = product.total_quantity || 0;
-      return total + (totalQuantity * product.price || 0);
+      // Calculate value by summing all variants (price * quantity)
+      if (product.variants && product.variants.length > 0) {
+        const variantsValue = product.variants.reduce((variantTotal, variant) => {
+          const variantPrice = variant.sale_price || variant.price || 0;
+          const variantQuantity = variant.quantity || 0;
+          return variantTotal + (variantPrice * variantQuantity);
+        }, 0);
+        return total + variantsValue;
+      }
+      return total;
     }, 0);
   };
 
   const getTotalItems = () => {
     return inventoryData.reduce((total, product) => {
-      return total + (product.total_quantity || 0);
+      return total + getComputedTotal(product);
+    }, 0);
+  };
+
+  const getTotalAvailableItems = () => {
+    return inventoryData.reduce((total, product) => {
+      return total + getComputedAvailable(product);
     }, 0);
   };
 
@@ -192,6 +217,16 @@ const Inventory = () => {
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+  };
+
+  const handleViewVariants = (product) => {
+    setSelectedProduct(product);
+    setVariantsModalOpen(true);
+  };
+
+  const handleCloseVariantsModal = () => {
+    setVariantsModalOpen(false);
+    setSelectedProduct(null);
   };
 
   if (loading) {
@@ -286,8 +321,8 @@ const Inventory = () => {
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                     {inventoryData.filter(product => {
-                      const totalQuantity = product.total_quantity || 0;
-                      return getStockStatus(totalQuantity).status === 'low_stock';
+                      const availableQuantity = getComputedAvailable(product);
+                      return getStockStatus(availableQuantity).status === 'low_stock';
                     }).length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -308,8 +343,8 @@ const Inventory = () => {
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                     {inventoryData.filter(product => {
-                      const totalQuantity = product.total_quantity || 0;
-                      return getStockStatus(totalQuantity).status === 'out_of_stock';
+                      const availableQuantity = getComputedAvailable(product);
+                      return getStockStatus(availableQuantity).status === 'out_of_stock';
                     }).length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -355,7 +390,7 @@ const Inventory = () => {
             ))}
           </Select>
         </FormControl>
-      
+        
         <FormControl sx={{ minWidth: 150 }}>
           <InputLabel>Filter by Status</InputLabel>
           <Select
@@ -384,21 +419,31 @@ const Inventory = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Product</TableCell>
+                <TableCell>Product ID</TableCell>
                 <TableCell>Category</TableCell>
                 <TableCell>Total Stock</TableCell>
+                <TableCell>Available Stock</TableCell>
+                <TableCell>Variants</TableCell>
                 <TableCell>Unit Price</TableCell>
                 <TableCell>Total Value</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Actions</TableCell>
+            
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredData
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((product) => {
-                  const totalQuantity = product.total_quantity || 0;
-                  const totalValue = product.total_value || 0;
-                  const stockStatus = getStockStatus(totalQuantity);
+                  const totalQuantity = getComputedTotal(product);
+                  // Calculate total value from all variants
+                  const totalValue = product.variants && product.variants.length > 0 
+                    ? product.variants.reduce((variantTotal, variant) => {
+                        const variantPrice = variant.sale_price || variant.price || 0;
+                        const variantQuantity = variant.quantity || 0;
+                        return variantTotal + (variantPrice * variantQuantity);
+                      }, 0)
+                    : product.total_value || 0;
+                  const stockStatus = getStockStatus(getComputedAvailable(product));
                   
                   return (
                     <TableRow key={product.id} hover>
@@ -412,11 +457,14 @@ const Inventory = () => {
                             <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                               {product.name}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              SKU: {product.sku} • {product.variants_count || 0} variants
-                            </Typography>
+                            
                           </Box>
                         </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#1976d2' }}>
+                          {product.product_id || 'N/A'}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
@@ -433,7 +481,50 @@ const Inventory = () => {
                           {totalQuantity}
                         </Typography>
                       </TableCell>
-                      <TableCell>PKR {product.price || 0}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#2196F3' }}>
+                          {getComputedAvailable(product)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<Visibility />}
+                          onClick={() => handleViewVariants(product)}
+                          sx={{ 
+                            minWidth: 'auto',
+                            px: 1,
+                            py: 0.5,
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          {product.variants_count || 0} variants
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        {product.variants && product.variants.length > 0 ? (
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                              PKR {product.display_sale_price || product.display_price || 0}
+                            </Typography>
+                            {product.display_sale_price && (
+                              <Typography variant="caption" sx={{ textDecoration: 'line-through', color: '#757575' }}>
+                                PKR {product.display_price}
+                              </Typography>
+                            )}
+                            {product.variants.length > 1 && (
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                ({product.variants.length} variants)
+                              </Typography>
+                            )}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                            No variants
+                          </Typography>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           PKR {totalValue.toLocaleString()}
@@ -446,16 +537,7 @@ const Inventory = () => {
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          onClick={() => handleAdjustStock(product)}
-                          sx={{ mr: 1 }}
-                        >
-                          Adjust Stock
-                        </Button>
-                      </TableCell>
+                     
                     </TableRow>
                   );
                 })}
@@ -474,35 +556,204 @@ const Inventory = () => {
       </Paper>
 
 
-      {/* Edit Quantity Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Adjust Stock Quantity</DialogTitle>
+
+      {/* Variants Modal */}
+      <Dialog 
+        open={variantsModalOpen} 
+        onClose={handleCloseVariantsModal} 
+        maxWidth="lg" 
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">
+            Product Variants - {selectedProduct?.name}
+          </Typography>
+          <IconButton onClick={handleCloseVariantsModal} size="small">
+            <Close />
+          </IconButton>
+        </DialogTitle>
         <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <Typography variant="body1" sx={{ mb: 2, fontWeight: 'bold' }}>
-              Product: {selectedItem?.name}
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-              SKU: {selectedItem?.sku}
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-              Current Stock: {selectedItem?.total_quantity || 0} units
-            </Typography>
-            <TextField
-              label="New Stock Quantity"
-              type="number"
-              value={editQuantity}
-              onChange={(e) => setEditQuantity(parseInt(e.target.value) || 0)}
-              fullWidth
-              sx={{ mt: 2 }}
-              helperText="Enter the new total stock quantity for this product"
-            />
-          </Box>
+          {selectedProduct && (
+            <Box>
+              {/* Product Info */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  {selectedProduct.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Total Stock: {getComputedTotal(selectedProduct)} units
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Available Stock: {getComputedAvailable(selectedProduct)} units
+                </Typography>
+              </Box>
+
+              {/* Variants Table */}
+              {selectedProduct.variants && selectedProduct.variants.length > 0 ? (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Size</TableCell>
+                        <TableCell>Color</TableCell>
+                        <TableCell>Total Stock</TableCell>
+                        <TableCell>Available Stock</TableCell>
+                        <TableCell>SKU</TableCell>
+                        <TableCell>Price</TableCell>
+                        <TableCell>Sale Price</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {selectedProduct.variants_with_stock ? 
+                        selectedProduct.variants_with_stock.map((variantData, index) => (
+                          <TableRow key={variantData.variant.id || index}>
+                            <TableCell>
+                              <Chip 
+                                label={variantData.variant.size || 'N/A'} 
+                                size="small" 
+                                variant="outlined"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Box
+                                  sx={{
+                                    width: 20,
+                                    height: 20,
+                                    borderRadius: '50%',
+                                    backgroundColor: variantData.variant.color?.toLowerCase() || '#ccc',
+                                    border: '1px solid #ddd'
+                                  }}
+                                />
+                                <Typography variant="body2">
+                                  {variantData.variant.color || 'N/A'}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontWeight: 'bold',
+                                  color: variantData.total_stock > 0 ? 'success.main' : 'error.main'
+                                }}
+                              >
+                                {variantData.total_stock || 0}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontWeight: 'bold',
+                                  color: variantData.available_stock > 0 ? '#2196F3' : 'error.main'
+                                }}
+                              >
+                                {variantData.available_stock || 0}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                                {variantData.variant.sku || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                PKR {variantData.variant.price || selectedProduct.price || 0}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {variantData.variant.sale_price ? `PKR ${variantData.variant.sale_price}` : 'N/A'}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        )) :
+                        selectedProduct.variants.map((variant, index) => (
+                          <TableRow key={variant.id || index}>
+                            <TableCell>
+                              <Chip 
+                                label={variant.size || 'N/A'} 
+                                size="small" 
+                                variant="outlined"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Box
+                                  sx={{
+                                    width: 20,
+                                    height: 20,
+                                    borderRadius: '50%',
+                                    backgroundColor: variant.color?.toLowerCase() || '#ccc',
+                                    border: '1px solid #ddd'
+                                  }}
+                                />
+                                <Typography variant="body2">
+                                  {variant.color || 'N/A'}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontWeight: 'bold',
+                                  color: variant.quantity > 0 ? 'success.main' : 'error.main'
+                                }}
+                              >
+                                {variant.quantity || 0}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontWeight: 'bold',
+                                  color: '#757575'
+                                }}
+                              >
+                                N/A
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                                {variant.sku || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                PKR {variant.price || selectedProduct.price || 0}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {variant.sale_price ? `PKR ${variant.sale_price}` : 'N/A'}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      }
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <InventoryIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary">
+                    No variants found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    This product doesn't have any variants configured.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleSaveQuantity} variant="contained">
-            Save Changes
+          <Button onClick={handleCloseVariantsModal}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>

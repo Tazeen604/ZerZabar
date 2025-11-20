@@ -16,7 +16,7 @@ const HeroBanner = () => {
        sx={{
         position: "relative",
         width: "100%",          // ✅ no overflow
-        minHeight: "100vh",     // ✅ full height section
+        minHeight: "calc(100vh - 80px)",     // ✅ full height section minus navbar
         overflow: "hidden",
         display: "flex",
         justifyContent: "center",

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -19,6 +20,9 @@ import {
   ListItemText,
   CircularProgress,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import {
   Search,
@@ -35,25 +39,54 @@ import apiService from '../../src/services/api';
 import { getProductImageUrl } from '../../src/utils/imageUtils';
 
 const Products = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [availableColors, setAvailableColors] = useState([]);
+  const [availableSizes, setAvailableSizes] = useState([]);
 
   // Fetch products from API
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await apiService.getProducts();
+        const params = new URLSearchParams();
+        if (selectedCategory) params.append('category_id', selectedCategory);
+        if (selectedColor) params.append('color', selectedColor);
+        if (selectedSize) params.append('size', selectedSize);
+        if (searchTerm) params.append('search', searchTerm);
+        
+        const response = await apiService.get(`/admin/products?${params.toString()}`);
         console.log('Products response:', response);
         // Handle paginated response - the actual products are in response.data.data
         const productsData = response.data?.data || response.data || [];
         console.log('Products data:', productsData);
         if (Array.isArray(productsData)) {
           setProducts(productsData);
+          
+          // Extract unique colors and sizes from the data
+          const colors = new Set();
+          const sizes = new Set();
+          
+          productsData.forEach(product => {
+            if (product.available_colors) {
+              product.available_colors.forEach(color => colors.add(color));
+            }
+            if (product.available_sizes) {
+              product.available_sizes.forEach(size => sizes.add(size));
+            }
+          });
+          
+          setAvailableColors(Array.from(colors).sort());
+          setAvailableSizes(Array.from(sizes).sort());
         } else {
           console.error('Products data is not an array:', productsData);
           setProducts([]);
@@ -73,6 +106,22 @@ const Products = () => {
     };
 
     fetchProducts();
+  }, [selectedCategory, selectedColor, selectedSize, searchTerm]);
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await apiService.get('/admin/categories');
+        if (response.success) {
+          setCategories(response.data?.data || response.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+
+    fetchCategories();
   }, []);
 
   const handleMenuOpen = (event, product) => {
@@ -90,6 +139,9 @@ const Products = () => {
     if (action === 'View' && selectedProduct) {
       // Navigate to product detail page or open quick view modal
       window.open(`/product/${selectedProduct.id}`, '_blank');
+    } else if (action === 'Edit' && selectedProduct) {
+      // Navigate to edit product page
+      navigate(`/admin/edit-product/${selectedProduct.id}`);
     }
     handleMenuClose();
   };
@@ -132,6 +184,7 @@ const Products = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
+          onClick={() => navigate('/admin/add-product')}
           sx={{
             backgroundColor: '#FFD700',
             color: '#2C2C2C',
@@ -177,6 +230,57 @@ const Products = () => {
             ),
           }}
         />
+      </Box>
+
+      {/* Filters */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 4, flexWrap: 'wrap' }}>
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Category</InputLabel>
+          <Select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            label="Category"
+          >
+            <MenuItem value="">All Categories</MenuItem>
+            {categories.map((category) => (
+              <MenuItem key={category.id} value={category.id}>
+                {category.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Color</InputLabel>
+          <Select
+            value={selectedColor}
+            onChange={(e) => setSelectedColor(e.target.value)}
+            label="Color"
+          >
+            <MenuItem value="">All Colors</MenuItem>
+            {availableColors.map((color) => (
+              <MenuItem key={color} value={color}>
+                {color}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Size</InputLabel>
+          <Select
+            value={selectedSize}
+            onChange={(e) => setSelectedSize(e.target.value)}
+            label="Size"
+          >
+            <MenuItem value="">All Sizes</MenuItem>
+            {availableSizes.map((size) => (
+              <MenuItem key={size} value={size}>
+                {size}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Box>
 
       {/* Loading State */}
@@ -268,9 +372,9 @@ const Products = () => {
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
-                    ₨{product.sale_price || product.price}
+                    ₨{product.display_sale_price || product.display_price || 'No price'}
                   </Typography>
-                  {product.sale_price && (
+                  {product.display_sale_price && product.display_price && (
                     <Typography
                       variant="body2"
                       sx={{
@@ -278,7 +382,7 @@ const Products = () => {
                         textDecoration: 'line-through',
                       }}
                     >
-                      ₨{product.price}
+                      ₨{product.display_price}
                     </Typography>
                   )}
                 </Box>
@@ -317,7 +421,17 @@ const Products = () => {
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ color: '#757575' }}>
-                    Stock: {product.stock_quantity}
+                    {(() => {
+                      const inventoryQty = product.inventory && typeof product.inventory.quantity !== 'undefined'
+                        ? Number(product.inventory.quantity) || 0
+                        : null;
+                      const variantsQty = Array.isArray(product.variants)
+                        ? product.variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0)
+                        : null;
+                      const fallbackQty = typeof product.stock_quantity !== 'undefined' ? Number(product.stock_quantity) || 0 : 0;
+                      const totalStock = (inventoryQty !== null ? inventoryQty : (variantsQty !== null ? variantsQty : fallbackQty));
+                      return `Stock: ${totalStock}`;
+                    })()}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#757575' }}>
                     {product.category?.name || 'Uncategorized'}
@@ -345,6 +459,7 @@ const Products = () => {
                 <Button
                   size="small"
                   startIcon={<Edit />}
+                  onClick={() => navigate(`/admin/edit-product/${product.id}`)}
                   sx={{
                     color: '#FF9800',
                     '&:hover': {
@@ -397,67 +512,7 @@ const Products = () => {
         </Box>
       )}
 
-      {/* Action Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
-        }}
-        sx={{
-          '& .MuiPaper-root': {
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-          },
-        }}
-      >
-        <MenuItem
-          onClick={() => handleAction('View')}
-          sx={{
-            '&:hover': {
-              backgroundColor: 'rgba(33, 150, 243, 0.1)',
-            },
-          }}
-        >
-          <ListItemIcon>
-            <Visibility sx={{ color: '#2196F3' }} />
-          </ListItemIcon>
-          <ListItemText>View Details</ListItemText>
-        </MenuItem>
-        <MenuItem
-          onClick={() => handleAction('Edit')}
-          sx={{
-            '&:hover': {
-              backgroundColor: 'rgba(255, 152, 0, 0.1)',
-            },
-          }}
-        >
-          <ListItemIcon>
-            <Edit sx={{ color: '#FF9800' }} />
-          </ListItemIcon>
-          <ListItemText>Edit Product</ListItemText>
-        </MenuItem>
-        <MenuItem
-          onClick={() => handleAction('Delete')}
-          sx={{
-            '&:hover': {
-              backgroundColor: 'rgba(244, 67, 54, 0.1)',
-              color: '#F44336',
-            },
-          }}
-        >
-          <ListItemIcon>
-            <Delete sx={{ color: '#F44336' }} />
-          </ListItemIcon>
-          <ListItemText>Delete Product</ListItemText>
-        </MenuItem>
-      </Menu>
+     
     </Box>
   );
 };

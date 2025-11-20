@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Drawer,
   Box,
@@ -22,33 +22,142 @@ import {
   ShoppingBag,
   Edit,
 } from "@mui/icons-material";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import { useNavigate } from "react-router-dom";
 import { getImageUrl } from "../utils/imageUtils";
 import CartEditModal from "./CartEditModal";
+import apiService from "../services/api";
 
 const CartDrawer = ({ open, onClose }) => {
   const navigate = useNavigate();
-  const { items: cartItems, removeFromCart, updateQuantity, getTotalPrice, getTotalItems, clearCart } = useCart();
+  const { items: cartItems, removeFromCart, updateQuantity, getCartTotals, clearCart, loading, error } = useCart();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [refreshedItems, setRefreshedItems] = useState([]);
 
-  const handleQuantityChange = (cartId, newQuantity) => {
-    if (newQuantity < 1) {
-      removeFromCart(cartId);
-      setSnackbarMessage("Item removed from cart");
-      setSnackbarOpen(true);
-    } else {
-      updateQuantity(cartId, newQuantity);
+  // Refresh cart items with latest product data when drawer opens
+  useEffect(() => {
+    if (open && cartItems.length > 0) {
+      refreshCartItems();
+    }
+  }, [open, cartItems.length]);
+
+  const refreshCartItems = async () => {
+    try {
+      const refreshedItems = await Promise.all(
+        cartItems.map(async (item) => {
+          try {
+            const response = await apiService.getProduct(item.productId);
+            if (response && response.data) {
+              const product = response.data;
+              
+              // Find the selected variant to get the correct price
+              const selectedVariant = product.variants?.find(variant => 
+                variant.size === item.size && variant.color === item.color
+              );
+              
+              const variantPrice = selectedVariant?.sale_price || selectedVariant?.price || item.price;
+              const variantOriginalPrice = selectedVariant?.sale_price ? selectedVariant?.price : null;
+              
+              return {
+                ...item,
+                product_id: product.product_id, // Admin-entered Product ID
+                price: parseFloat(variantPrice),
+                originalPrice: variantOriginalPrice ? parseFloat(variantOriginalPrice) : item.originalPrice,
+                image: product.images?.[0]?.image_path || item.image, // Update image from product data
+                variants: product.variants || [],
+                sizes: product.variants ? [...new Set(product.variants.map(v => v.size).filter(Boolean))] : [],
+                colors: product.variants ? [...new Set(product.variants.map(v => v.color).filter(Boolean))] : []
+              };
+            }
+          } catch (error) {
+            console.error('Error refreshing product data for item:', item.id, error);
+            return item; // Return original item if refresh fails
+          }
+          return item;
+        })
+      );
+      setRefreshedItems(refreshedItems);
+    } catch (error) {
+      console.error('Error refreshing cart items:', error);
+      setRefreshedItems(cartItems);
     }
   };
 
-  const handleRemoveItem = (cartId) => {
-    removeFromCart(cartId);
-    setSnackbarMessage("Item removed from cart");
-    setSnackbarOpen(true);
+  // Get current stock for a cart item
+  const getCurrentStock = (cartItem) => {
+    if (!cartItem) return 0;
+    
+    // Use refreshed item if available, otherwise use original cart item
+    const itemToCheck = refreshedItems.find(refreshed => refreshed.cartId === cartItem.cartId) || cartItem;
+    
+    // Check if cart item has variant data
+    if (itemToCheck.variants && itemToCheck.variants.length > 0) {
+      // Find the specific variant based on size and color
+      const selectedVariant = itemToCheck.variants.find(variant => 
+        variant.size === itemToCheck.size && variant.color === itemToCheck.color
+      );
+      
+      if (selectedVariant) {
+        return selectedVariant.quantity || 0;
+      }
+    }
+    
+    // Fallback to old stock_quantity if no variant data
+    return itemToCheck.stock_quantity || 0;
+  };
+
+  const handleQuantityChange = async (cartItemId, newQuantity) => {
+    if (newQuantity < 1) {
+      const result = await removeFromCart(cartItemId);
+      if (result.success) {
+        setSnackbarMessage(result.message);
+        setSnackbarOpen(true);
+      } else {
+        setSnackbarMessage(result.message);
+        setSnackbarOpen(true);
+      }
+    } else {
+      // Find the cart item to check stock
+      const cartItem = cartItems.find(item => item.id === cartItemId);
+      if (cartItem) {
+        // Use the getCurrentStock function which handles refreshed items
+        const currentStock = getCurrentStock(cartItem);
+        
+        if (currentStock === 0) {
+          setSnackbarMessage("This variant is out of stock");
+          setSnackbarOpen(true);
+          return;
+        }
+        if (newQuantity > currentStock) {
+          setSnackbarMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+          setSnackbarOpen(true);
+          return;
+        }
+      }
+      
+      const result = await updateQuantity(cartItemId, newQuantity);
+      if (result.success) {
+        setSnackbarMessage(result.message);
+        setSnackbarOpen(true);
+      } else {
+        setSnackbarMessage(result.message);
+        setSnackbarOpen(true);
+      }
+    }
+  };
+
+  const handleRemoveItem = async (cartItemId) => {
+    const result = await removeFromCart(cartItemId);
+    if (result.success) {
+      setSnackbarMessage(result.message);
+      setSnackbarOpen(true);
+    } else {
+      setSnackbarMessage(result.message);
+      setSnackbarOpen(true);
+    }
   };
 
   const handleCheckout = () => {
@@ -70,6 +179,7 @@ const CartDrawer = ({ open, onClose }) => {
   const handleEditItem = (item) => {
     setSelectedItem(item);
     setEditModalOpen(true);
+    onClose(); // Close the cart drawer when opening edit modal
   };
 
   const handleEditModalClose = () => {
@@ -79,12 +189,16 @@ const CartDrawer = ({ open, onClose }) => {
 
   const handleEditUpdate = (updatedItem) => {
     if (updatedItem) {
-      setSnackbarMessage("Cart item updated successfully!");
-      setSnackbarOpen(true);
+      // No-op: Edit modal handles updating the cart and messages
     } else {
       setSnackbarMessage("Item removed from cart!");
       setSnackbarOpen(true);
     }
+  };
+
+  const handleProductClick = (productId) => {
+    navigate(`/product/${productId}`);
+    onClose(); // Close the cart drawer
   };
 
   return (
@@ -98,7 +212,8 @@ const CartDrawer = ({ open, onClose }) => {
             width: { xs: "90vw", sm: "70vw", md: 450 },
             maxWidth: { xs: "90vw", sm: "70vw", md: 450 },
             minWidth: { xs: "300px", sm: "350px", md: 450 },
-            height: "100vh",
+            height: { xs: "calc(100vh - 80px)", sm: "100vh", md: "100vh" },
+            top: { xs: 80, sm: 0, md: 0 },
             display: "flex",
             flexDirection: "column"
           }
@@ -163,7 +278,18 @@ const CartDrawer = ({ open, onClose }) => {
                     }}
                   >
                     {/* Product Image */}
-                    <Box sx={{ width: { xs: 80, sm: 100 }, height: { xs: 80, sm: 100 }, flexShrink: 0 }}>
+                    <Box 
+                      sx={{ 
+                        width: { xs: 80, sm: 100 }, 
+                        height: { xs: 80, sm: 100 }, 
+                        flexShrink: 0,
+                        cursor: "pointer",
+                        "&:hover": {
+                          opacity: 0.8
+                        }
+                      }}
+                      onClick={() => handleProductClick(item.productId)}
+                    >
               <Box
                 sx={{
                   width: "100%",
@@ -198,8 +324,14 @@ const CartDrawer = ({ open, onClose }) => {
                           textOverflow: "ellipsis",
                           display: "-webkit-box",
                           WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical"
+                          WebkitBoxOrient: "vertical",
+                          cursor: "pointer",
+                          "&:hover": {
+                            color: "primary.main",
+                            textDecoration: "underline"
+                          }
                         }}
+                        onClick={() => handleProductClick(item.productId)}
                       >
                         {item.name}
               </Typography>
@@ -236,11 +368,21 @@ const CartDrawer = ({ open, onClose }) => {
                         )}
                       </Stack>
                       
+                      {/* Stock indicator */}
+                      <Typography variant="body2" sx={{ 
+                        color: getCurrentStock(item) > 0 ? 'success.main' : 'error.main',
+                        fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                        fontWeight: 500,
+                        mb: 1
+                      }}>
+                        {getCurrentStock(item) > 0 ? `${getCurrentStock(item)} available` : 'Out of stock'}
+                      </Typography>
+                      
                       {/* Quantity Controls */}
                       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <Stack direction="row" spacing={0.5} alignItems="center">
               <IconButton
-                            onClick={() => handleQuantityChange(item.cartId, item.quantity - 1)}
+                            onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                 size="small"
                 sx={{ 
                   border: "1px solid #e0e0e0",
@@ -255,7 +397,7 @@ const CartDrawer = ({ open, onClose }) => {
               </IconButton>
               <TextField
                             value={item.quantity}
-                            onChange={(e) => handleQuantityChange(item.cartId, parseInt(e.target.value) || 1)}
+                            onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
                 sx={{ 
                               width: { xs: 50, sm: 60 }, 
                   "& .MuiInputBase-input": { 
@@ -267,7 +409,7 @@ const CartDrawer = ({ open, onClose }) => {
                 size="small"
               />
               <IconButton
-                            onClick={() => handleQuantityChange(item.cartId, item.quantity + 1)}
+                            onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
                 size="small"
                 sx={{ 
                   border: "1px solid #e0e0e0",
@@ -297,7 +439,7 @@ const CartDrawer = ({ open, onClose }) => {
                             <Edit sx={{ fontSize: { xs: "1rem", sm: "1.1rem" } }} />
                           </IconButton>
                           <IconButton
-                            onClick={() => handleRemoveItem(item.cartId)}
+                            onClick={() => handleRemoveItem(item.id)}
                             size="small"
                             sx={{ 
                               color: "#f44336",
@@ -325,10 +467,10 @@ const CartDrawer = ({ open, onClose }) => {
               {/* Total */}
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: { xs: 2, sm: 3 } }}>
                 <Typography variant="h6" sx={{ fontWeight: 550, fontSize: { xs: "0.9rem", sm: "1rem" } }}>
-                  Total ({getTotalItems()} {getTotalItems() === 1 ? 'item' : 'items'})
+                  Total ({getCartTotals().itemCount} {getCartTotals().itemCount === 1 ? 'item' : 'items'})
             </Typography>
                 <Typography variant="h5" sx={{ fontWeight: 550, color: "#000", fontSize: { xs: "0.9rem", sm: "1rem" } }}>
-                  ₨{parseFloat(getTotalPrice() || 0).toFixed(2)}
+                  ₨{parseFloat(getCartTotals().totalAmount || 0).toFixed(2)}
             </Typography>
           </Box>
           

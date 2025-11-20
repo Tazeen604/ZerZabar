@@ -1,12 +1,29 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiService from '../../src/services/api';
 
-const SettingsContext = createContext();
+// Default context value to prevent errors if used outside provider
+const defaultContextValue = {
+  settings: {},
+  loading: true,
+  error: null,
+  updateSettings: async () => false,
+  getSetting: (key, defaultValue = null) => defaultValue,
+  isLowStock: () => false,
+  isOutOfStock: () => false,
+  isNewArrival: () => false,
+  getStockStatus: () => ({ status: 'in_stock', label: 'In Stock', color: 'success' }),
+  refreshSettings: async () => {},
+};
+
+const SettingsContext = createContext(defaultContextValue);
 
 export const useSettings = () => {
   const context = useContext(SettingsContext);
+  // With default value, context should never be null/undefined
+  // But we'll keep a safety check for edge cases
   if (!context) {
-    throw new Error('useSettings must be used within a SettingsProvider');
+    console.warn('useSettings: Context is null, using default value. This may indicate the component is outside SettingsProvider.');
+    return defaultContextValue;
   }
   return context;
 };
@@ -41,13 +58,9 @@ export const SettingsProvider = ({ children }) => {
         require_product_approval: true,
         order_auto_confirm: false,
         order_confirmation_email: true,
-        low_stock_notification: true,
         maintenance_mode: false,
         debug_mode: false,
         backup_frequency: 'daily',
-        email_notifications: true,
-        sms_notifications: false,
-        push_notifications: true,
         default_theme: 'light',
         accent_color: '#FFD700',
         primary_color: '#2C2C2C',

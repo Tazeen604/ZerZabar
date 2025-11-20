@@ -10,6 +10,7 @@ import {
   IconButton,
 } from '@mui/material';
 import Breadcrumbs from '../components/Breadcrumbs';
+import PageHeaderWithSettings from "../components/PageHeaderWithSettings";
 import {
   LocationOn,
   Phone,
@@ -153,28 +154,15 @@ const Contact = () => {
 
   return (
     <>
+      <PageHeaderWithSettings title="Contact Us" breadcrumb="Home / Contact" defaultBgImage="/images/new-arrival.jpg" />
       <Box sx={{ 
-        minHeight: 'calc(100vh - 120px)', 
+        minHeight: 'calc(100vh - 200px)', 
         backgroundColor: '#fff',
         py: { xs: 4, sm: 6, md: 8 },
-        px: { xs: 2, sm: 4, md: 6 },
-        mt: { xs: 2, sm: 4, md: 6 }
+        px: 0,
       }}>
-          <Breadcrumbs />
-        <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: '100%', md: '1200px' }, mx: 'auto' }}>
-          <Typography
-            variant="h1"
-            sx={{
-              textAlign: 'center',
-              fontWeight: 'bold',
-              color: '#2c3e50',
-              mb: { xs: 3, sm: 4, md: 6 },
-              fontSize: { xs: '1.8rem', sm: '2.2rem', md: '3rem' },
-              lineHeight: 1.2,
-            }}
-          >
-            Contact Us
-          </Typography>
+        <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: '100%', md: '1200px' }, mx: 'auto', px: { xs: 2, sm: 2, md: 3 } }}>
+         
           <Grid container spacing={0} sx={{ 
             minHeight: { xs: 'auto', md: '600px' },
             maxHeight: { xs: 'none', md: '700px' },
@@ -185,6 +173,9 @@ const Contact = () => {
             display: 'flex',
             flexDirection: { xs: 'column', md: 'row' },
             alignItems: 'stretch',
+            columnGap: { xs: 0, md: 0.5 },
+            rowGap: { xs: 1, md: 0 },
+            flexWrap: { xs: 'wrap', md: 'nowrap' },
             width: '100%',
             m: { xs: 0, sm: 2, md: 4 },
             mb: { xs: 2, sm: 4, md: 6 }
@@ -194,7 +185,12 @@ const Contact = () => {
               width: { xs: '100%', md: '33%' }, 
               flex: { xs: 'none', md: '0 0 33%' }, 
               display: 'flex',
-              order: { xs: 2, md: 1 }
+              order: { xs: 2, md: 1 },
+              boxShadow: "0 8px 24px rgba(248, 244, 27, 0.1)",
+              transition: "box-shadow 0.3s ease",
+              "&:hover": {
+                boxShadow: "0 12px 32px rgba(247, 213, 23, 0.2)",
+              },
             }}>
                 <Paper
                   sx={{
@@ -249,7 +245,7 @@ const Contact = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.8)',
                       }}
                     >
                       <LocationOn sx={{ color: 'white', fontSize: 24 }} />
@@ -436,7 +432,12 @@ const Contact = () => {
               width: { xs: '100%', md: '67%' }, 
               flex: { xs: 'none', md: '0 0 67%' }, 
               display: 'flex',
-              order: { xs: 1, md: 2 }
+              order: { xs: 1, md: 2 },
+              boxShadow: "0 8px 24px rgba(0,0,0,0.9)",
+              transition: "box-shadow 0.3s ease",
+              "&:hover": {
+                boxShadow: "0 12px 32px rgba(0,0,0,0.8)",
+              },
             }}>
               <Paper
                 sx={{
@@ -727,7 +728,7 @@ const Contact = () => {
                           fontSize: '1rem',
                           px: 4,
                           py: 1.5,
-                          borderRadius: '4px',
+                          borderRadius: '25px',
                           textTransform: 'none',
                           '&:hover': {
                             backgroundColor: isSubmitting ? '#ccc' : '#FFC107',

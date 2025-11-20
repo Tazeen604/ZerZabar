@@ -56,15 +56,15 @@ const Footer = () => {
 	};
 
 	return (
-		<Box component="footer" sx={{ width: '100%', backgroundColor: '#000', color: '#fff', m: 0, p: 0 }}>
+		<Box component="footer" sx={{ width: '100%', backgroundColor: '#000', color: '#fff', m: 0, p: 0, flexShrink: 0 }}>
 			{/* Links area */}
 			<Box sx={{ px: { xs: 2, md: 6 }, py: { xs: 3, md: 4.5 }, maxWidth: '1280px', mx: 'auto' }}>
 				<Grid container columnSpacing={{ xs: 6, md: 8, lg: 12 }} rowSpacing={{ xs: 2, md: 0 }}>
 					<Grid item xs={12} md={3}>
 						<Typography sx={headingSx}>Information</Typography>
 						<Box sx={{ display: 'grid' }}>
-							<MuiLink href="#" sx={linkSx}>About us</MuiLink>
-							<MuiLink href="#" sx={linkSx}>Contact Us</MuiLink>
+							<MuiLink href="/about" sx={linkSx}>About us</MuiLink>
+							<MuiLink href="/contact" sx={linkSx}>Contact Us</MuiLink>
 							<MuiLink href="#" sx={linkSx}>Career</MuiLink>
 							
 							<MuiLink href="#" sx={linkSx}>Orders and Returns</MuiLink>

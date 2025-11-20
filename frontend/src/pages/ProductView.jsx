@@ -27,10 +27,12 @@ import {
   ShoppingCart as ShoppingCartIcon,
   Visibility as VisibilityIcon,
   Favorite as FavoriteIcon,
+  Help,
+  ArrowBackIos as ArrowBackIosIcon,
+  ArrowForwardIos as ArrowForwardIosIcon,
 } from "@mui/icons-material";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import api from "../services/api";
-import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import Footer from "../components/Footer";
@@ -38,9 +40,10 @@ import { getProductImageUrl, getImageUrl } from "../utils/imageUtils";
 import ProductCard from "../components/ProductCard";
 import CartDrawer from "../components/CartDrawer";
 import CartSelectionModal from "../components/CartSelectionModal";
+import SizeChartDrawer from "../components/SizeChartDrawer";
 
 const ProductView = () => {
-  const { id } = useParams();
+  const { productId } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
 
@@ -56,7 +59,7 @@ const ProductView = () => {
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [stockErrorMessage, setStockErrorMessage] = useState("");
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0); // Current image index
   const [showImageIndex, setShowImageIndex] = useState(true); // Whether to show image index
@@ -68,6 +71,16 @@ const ProductView = () => {
   const [colorError, setColorError] = useState("");
   const [cartModalOpen, setCartModalOpen] = useState(false);
   const [modalProduct, setModalProduct] = useState(null);
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
+  const [relatedCarouselIndex, setRelatedCarouselIndex] = useState(0);
+  const [relatedScreenSize, setRelatedScreenSize] = useState('desktop');
+  const [imageZoom, setImageZoom] = useState(1);
+  const [hoverZoom, setHoverZoom] = useState({ show: false, x: 0, y: 0 });
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const imageContainerRef = useRef(null);
   const stickyTop = 80;
 
   const containerRef = useRef(null); // slider container
@@ -146,47 +159,122 @@ const ProductView = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, [product?.images]);
 
-  // Fetch product
+  // Update price when size or color changes
   useEffect(() => {
-    const fetchProduct = async (productId) => {
-      try {
-        setLoading(true);
-        let actualId = productId || id;
-        if (!actualId) {
-          const pathParts = window.location.pathname.split("/");
-          const productIndex = pathParts.indexOf("product");
-          if (productIndex !== -1 && pathParts[productIndex + 1]) actualId = pathParts[productIndex + 1];
-        }
-        if (!actualId) {
-          setError("Product ID is missing");
-          return;
-        }
+    // This will trigger a re-render when selectedSize or selectedColor changes
+    // The price display logic will automatically update
+  }, [selectedSize, selectedColor, product]);
 
+  // Fetch product - Reset state when productId changes
+  useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates if component unmounts
+    
+    // Get the actual product ID from params or URL
+    let actualId = productId;
+    if (!actualId) {
+      const pathParts = window.location.pathname.split("/");
+      const productIndex = pathParts.indexOf("product");
+      if (productIndex !== -1 && pathParts[productIndex + 1]) {
+        actualId = pathParts[productIndex + 1];
+      }
+    }
+    
+    if (!actualId) {
+      setError("Product ID is missing");
+      setLoading(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // Reset state when navigating to a new product (always reset when productId changes)
+    setProduct(null);
+    setSelectedSize("");
+    setSelectedColor("");
+    setQuantity(1);
+    setSelectedImageIndex(0);
+    setCurrentIndex(0);
+    setError(null);
+    setStockErrorMessage("");
+    setSizeError("");
+    setColorError("");
+    setImageZoom(1); // Reset zoom
+    setHoverZoom({ show: false, x: 0, y: 0 }); // Reset hover zoom
+    setImagePosition({ x: 0, y: 0 }); // Reset image position
+    setIsDragging(false); // Reset dragging state
+    setLoading(true);
+    
+    const fetchProduct = async (productIdParam) => {
+      try {
         let response;
         try {
-          response = await api.getProduct(actualId);
-        } catch {
-          const directResponse = await fetch(`/api/products/${actualId}`);
-          if (directResponse.ok) {
-            const directData = await directResponse.json();
-            setProduct(directData.data || directData);
-            return;
-          } else throw new Error("API fetch failed");
+          response = await api.getProduct(productIdParam);
+        } catch (apiError) {
+          console.error("API error:", apiError);
+          try {
+            const directResponse = await fetch(`/api/products/${productIdParam}`);
+            if (directResponse.ok) {
+              const directData = await directResponse.json();
+              if (isMounted) {
+                setProduct(directData.data || directData);
+                setLoading(false);
+                // Scroll to top when new product loads
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+              return;
+            } else {
+              throw new Error("API fetch failed");
+            }
+          } catch (fetchError) {
+            console.error("Fetch error:", fetchError);
+            throw fetchError;
+          }
         }
 
-        if (response?.data) setProduct(response.data);
-        else if (response?.product) setProduct(response.product);
-        else setProduct(response);
+        if (isMounted) {
+          if (response?.data) setProduct(response.data);
+          else if (response?.product) setProduct(response.product);
+          else if (response) setProduct(response);
+          
+          setLoading(false);
+          // Scroll to top when new product loads
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
       } catch (err) {
-        console.error(err);
-        setError("Failed to load product");
-      } finally {
-        setLoading(false);
+        console.error("Product fetch error:", err);
+        if (isMounted) {
+          setError("Failed to load product");
+          setLoading(false);
+        }
       }
     };
 
-    fetchProduct(id);
-  }, [id]);
+    fetchProduct(actualId);
+    
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [productId]);
+
+  // Handle screen size changes for related products carousel
+  useEffect(() => {
+    const handleResize = () => {
+      const newScreenSize = window.innerWidth < 600 ? 'mobile' : 
+                           window.innerWidth < 960 ? 'tablet' : 
+                           window.innerWidth < 1200 ? 'desktop' : 'large';
+      
+      if (newScreenSize !== relatedScreenSize) {
+        setRelatedScreenSize(newScreenSize);
+        // Reset to first item when screen size changes
+        setRelatedCarouselIndex(0);
+      }
+    };
+
+    handleResize(); // Set initial size
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [relatedScreenSize]);
 
   // Fetch related products
   useEffect(() => {
@@ -214,10 +302,46 @@ const ProductView = () => {
     fetchRelatedProducts();
   }, [product]);
 
+  // Set default size when product loads
+  useEffect(() => {
+    if (product?.variants?.length && !selectedSize) {
+      const availableSizes = getAvailableSizes();
+      if (availableSizes.length > 0) {
+        setSelectedSize(availableSizes[0]);
+      }
+    }
+  }, [product, selectedSize]);
+
+  // Extract unique sizes and colors from variants
+  const getAvailableSizes = () => {
+    if (!product?.variants?.length) return [];
+    const sizes = [...new Set(product.variants.map(v => v.size).filter(Boolean))];
+    return sizes;
+  };
+
+  const getAvailableColors = () => {
+    if (!product?.variants?.length) return [];
+    
+    // If a size is selected, only show colors available for that size
+    if (selectedSize) {
+      const colorsForSize = product.variants
+        .filter(variant => variant.size === selectedSize)
+        .map(variant => variant.color)
+        .filter(Boolean);
+      return [...new Set(colorsForSize)];
+    }
+    
+    // If no size selected, show all available colors
+    const colors = [...new Set(product.variants.map(v => v.color).filter(Boolean))];
+    return colors;
+  };
+
   // Check if all required options are selected
   const areAllOptionsSelected = () => {
-    const hasSize = !product?.sizes?.length || selectedSize;
-    const hasColor = !product?.colors?.length || selectedColor;
+    const availableSizes = getAvailableSizes();
+    const availableColors = getAvailableColors();
+    const hasSize = !availableSizes.length || selectedSize;
+    const hasColor = !availableColors.length || selectedColor;
     return hasSize && hasColor;
   };
 
@@ -226,10 +350,39 @@ const ProductView = () => {
     return areAllOptionsSelected() ? "Add to Cart" : "Select Options";
   };
 
+  // Get current stock from the selected variant
+  const getCurrentStock = () => {
+    if (!product || !product.variants?.length) return 0;
+    
+    // Find the specific variant based on selected size and color
+    const selectedVariant = product.variants.find(variant => 
+      variant.size === selectedSize && variant.color === selectedColor
+    );
+    
+    if (!selectedVariant) return 0;
+    
+    // Return the variant's quantity directly
+    return selectedVariant.quantity || 0;
+  };
+
   // Handle option selection with error clearing
   const handleSizeChange = (size) => {
     setSelectedSize(size);
     setSizeError("");
+    
+    // If color is selected, check if it's available for the new size
+    if (selectedColor) {
+      const availableColorsForNewSize = product?.variants
+        ?.filter(variant => variant.size === size)
+        ?.map(variant => variant.color)
+        ?.filter(Boolean) || [];
+      
+      // If current color is not available for new size, clear it
+      if (!availableColorsForNewSize.includes(selectedColor)) {
+        setSelectedColor("");
+        setColorError("");
+      }
+    }
   };
 
   const handleColorChange = (color) => {
@@ -241,44 +394,134 @@ const ProductView = () => {
     // Clear previous errors
     setSizeError("");
     setColorError("");
+    setStockErrorMessage("");
 
     // Check for missing selections and set errors
     let hasErrors = false;
-    if (!selectedSize && product?.sizes?.length) {
+    const availableSizes = getAvailableSizes();
+    const availableColors = getAvailableColors();
+    
+    if (!selectedSize && availableSizes.length) {
       setSizeError("Please select a size");
       hasErrors = true;
     }
-    if (!selectedColor && product?.colors?.length) {
+    if (!selectedColor && availableColors.length) {
       setColorError("Please select a color");
       hasErrors = true;
     }
 
     if (hasErrors) return;
     
+    // Check stock availability before adding to cart
+    const currentStock = getCurrentStock();
+    if (currentStock === 0) {
+      setStockErrorMessage("This variant is out of stock");
+      setTimeout(() => setStockErrorMessage(""), 3000);
+      return;
+    }
+    if (quantity > currentStock) {
+      setStockErrorMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+      setTimeout(() => setStockErrorMessage(""), 3000);
+      return;
+    }
+    
+    // Find the selected variant to get the correct price
+    const selectedVariant = product.variants?.find(variant => 
+      variant.size === selectedSize && variant.color === selectedColor
+    );
+    
+    const variantPrice = selectedVariant?.sale_price || selectedVariant?.price || 0;
+    const variantOriginalPrice = selectedVariant?.sale_price ? selectedVariant?.price : null;
+    
     addToCart({
       id: product.id,
       name: product.name,
-      price: product.sale_price || product.price,
+      product_id: product.product_id, // Admin-entered Product ID
+      price: parseFloat(variantPrice),
+      originalPrice: variantOriginalPrice ? parseFloat(variantOriginalPrice) : null,
       image: product.images?.[0]?.image_path,
       size: selectedSize,
       color: selectedColor,
       quantity,
+      // Include product variants for cart editing
+      sizes: getAvailableSizes(),
+      colors: getAvailableColors(),
+      variants: product.variants || []
     });
-
-    // Show success message
-    setShowSuccessMessage(true);
-    setTimeout(() => setShowSuccessMessage(false), 3000);
 
     // Open cart drawer
     setCartDrawerOpen(true);
   };
 
   const handleCheckout = () => {
+    // Clear previous errors
+    setSizeError("");
+    setColorError("");
+    setStockErrorMessage("");
+
+    // Check for missing selections and set errors
+    let hasErrors = false;
+    const availableSizes = getAvailableSizes();
+    const availableColors = getAvailableColors();
+    
+    if (!selectedSize && availableSizes.length) {
+      setSizeError("Please select a size");
+      hasErrors = true;
+    }
+    if (!selectedColor && availableColors.length) {
+      setColorError("Please select a color");
+      hasErrors = true;
+    }
+
+    if (hasErrors) return;
+    
+    // Check stock availability before adding to cart
+    const currentStock = getCurrentStock();
+    if (currentStock === 0) {
+      setStockErrorMessage("This variant is out of stock");
+      setTimeout(() => setStockErrorMessage(""), 3000);
+      return;
+    }
+    if (quantity > currentStock) {
+      setStockErrorMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+      setTimeout(() => setStockErrorMessage(""), 3000);
+      return;
+    }
+    
+    // Find the selected variant to get the correct price
+    const selectedVariant = product.variants?.find(variant => 
+      variant.size === selectedSize && variant.color === selectedColor
+    );
+    
+    const variantPrice = selectedVariant?.sale_price || selectedVariant?.price || 0;
+    const variantOriginalPrice = selectedVariant?.sale_price ? selectedVariant?.price : null;
+    
+    // Add to cart first
+    addToCart({
+      id: product.id,
+      name: product.name,
+      product_id: product.product_id, // Admin-entered Product ID
+      price: parseFloat(variantPrice),
+      originalPrice: variantOriginalPrice ? parseFloat(variantOriginalPrice) : null,
+      image: product.images?.[0]?.image_path,
+      size: selectedSize,
+      color: selectedColor,
+      quantity,
+      // Include product variants for cart editing
+      sizes: getAvailableSizes(),
+      colors: getAvailableColors(),
+      variants: product.variants || []
+    });
+
+    // Navigate to checkout
     navigate("/checkout");
   };
 
   const handleImageNavigation = (direction) => {
     if (!product?.images?.length) return;
+    
+    setImageZoom(1); // Reset zoom when navigating images
+    setImagePosition({ x: 0, y: 0 }); // Reset image position
     
     if (direction === 'prev') {
       setSelectedImageIndex(prev => 
@@ -293,10 +536,40 @@ const ProductView = () => {
 
   const handleThumbnailClick = (index) => {
     setSelectedImageIndex(index);
+    setImageZoom(1); // Reset zoom when changing image
+    setImagePosition({ x: 0, y: 0 }); // Reset image position
   };
 
   const handleRelatedProductClick = (productId) => {
+    // Force navigation - the useEffect will handle state reset
     navigate(`/product/${productId}`);
+  };
+
+  // Related products carousel navigation
+  const handleRelatedPrevious = () => {
+    const itemsPerView = relatedScreenSize === 'mobile' ? 2 : 
+                        relatedScreenSize === 'tablet' ? 2 : 
+                        relatedScreenSize === 'desktop' ? 3 : 4;
+    setRelatedCarouselIndex((prev) => 
+      prev === 0 ? Math.max(0, relatedProducts.length - itemsPerView) : prev - 1
+    );
+  };
+
+  const handleRelatedNext = () => {
+    const itemsPerView = relatedScreenSize === 'mobile' ? 2 : 
+                        relatedScreenSize === 'tablet' ? 2 : 
+                        relatedScreenSize === 'desktop' ? 3 : 4;
+    setRelatedCarouselIndex((prev) => 
+      prev >= relatedProducts.length - itemsPerView ? 0 : prev + 1
+    );
+  };
+
+  // Get visible products for carousel
+  const getVisibleRelatedProducts = () => {
+    const itemsPerView = relatedScreenSize === 'mobile' ? 2 : 
+                        relatedScreenSize === 'tablet' ? 2 : 
+                        relatedScreenSize === 'desktop' ? 3 : 4;
+    return relatedProducts.slice(relatedCarouselIndex, relatedCarouselIndex + itemsPerView);
   };
 
   const handleRelatedAddToCart = (product) => {
@@ -321,14 +594,14 @@ const ProductView = () => {
 
   if (loading)
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "calc(100vh - 120px)" }}>
         <CircularProgress />
       </Box>
     );
 
   if (error)
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "100vh", p: 4 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "calc(100vh - 120px)", p: 4 }}>
         <Typography variant="h6" color="error" sx={{ mb: 2 }}>{error}</Typography>
         <Button 
           startIcon={<ArrowBackIosIcon />} 
@@ -348,8 +621,9 @@ const ProductView = () => {
     );
 
   return (
-    <Box sx={{ backgroundColor: "#fff", pt: "100px" }}>
+    <Box sx={{ backgroundColor: "#000", pt: "75px" }}>
       <Breadcrumbs />
+      <Box sx={{ backgroundColor: '#f8f9fa', minHeight: 'calc(100vh - 120px)' }}>
       {/* Back button */}
       <Box sx={{ px: 3, maxWidth: "1200px", mx: "auto", mb: 4 }}>
         <Button 
@@ -370,9 +644,9 @@ const ProductView = () => {
 
       {/* Main Product Section */}
       <Box sx={{ maxWidth: 1200, mx: "auto", px: 3, mb: 6 }}>
-        <Box sx={{ display: "flex", gap: 4, flexDirection: { xs: "column", lg: "row" } }}>
+        <Box sx={{ display: "flex", gap: { xs: 2, lg: 1.5 }, flexDirection: { xs: "column", lg: "row" } }}>
           {/* Left Side - Image Gallery */}
-          <Box sx={{ flex: 1, display: "flex", gap: 2 }}>
+          <Box sx={{ flex: { xs: 1, lg: 1.4 }, display: "flex", gap: 2 }}>
             {/* Thumbnails */}
             <Box sx={{ display: { xs: "none", md: "flex" }, flexDirection: "column", gap: 1, minWidth: 80 }}>
               {product?.images?.map((image, idx) => (
@@ -407,7 +681,85 @@ const ProductView = () => {
 
             {/* Main Image */}
             <Box sx={{ flex: 1, position: "relative" }}>
-              <Box sx={{ position: "relative", width: "100%", height: { xs: 400, md: 600 } }}>
+              <Box 
+                ref={imageContainerRef}
+                sx={{ 
+                  position: "relative", 
+                  width: "100%", 
+                  height: { xs: 400, md: 600 },
+                  overflow: "hidden",
+                  borderRadius: 2,
+                  cursor: imageZoom > 1 ? (isDragging ? "grabbing" : "grab") : hoverZoom.show ? "zoom-in" : "default",
+                  userSelect: "none"
+                }}
+                onMouseMove={(e) => {
+                  if (imageZoom > 1 && isDragging) {
+                    // Pan the image when zoomed
+                    const deltaX = e.clientX - dragStart.x;
+                    const deltaY = e.clientY - dragStart.y;
+                    setImagePosition(prev => ({
+                      x: prev.x + deltaX,
+                      y: prev.y + deltaY
+                    }));
+                    setDragStart({ x: e.clientX, y: e.clientY });
+                  } else if (imageZoom === 1) {
+                    // Show hover zoom
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    setMousePosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+                    setHoverZoom({ show: true, x, y });
+                  }
+                }}
+                onMouseDown={(e) => {
+                  if (imageZoom > 1) {
+                    setIsDragging(true);
+                    setDragStart({ x: e.clientX, y: e.clientY });
+                  }
+                }}
+                onMouseUp={() => {
+                  setIsDragging(false);
+                }}
+                onMouseLeave={() => {
+                  setHoverZoom({ show: false, x: 0, y: 0 });
+                  setIsDragging(false);
+                }}
+                onWheel={(e) => {
+                  if (imageZoom === 1) {
+                    e.preventDefault();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    
+                    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+                    const newZoom = Math.max(1, Math.min(4, imageZoom + delta));
+                    setImageZoom(newZoom);
+                    
+                    if (newZoom > 1) {
+                      // Center zoom on mouse position
+                      const containerWidth = rect.width;
+                      const containerHeight = rect.height;
+                      const offsetX = (containerWidth / 2 - (e.clientX - rect.left)) * (newZoom - 1);
+                      const offsetY = (containerHeight / 2 - (e.clientY - rect.top)) * (newZoom - 1);
+                      setImagePosition({ x: offsetX, y: offsetY });
+                    }
+                  } else {
+                    // When already zoomed, allow panning with shift+scroll or just scroll
+                    if (e.shiftKey) {
+                      e.preventDefault();
+                      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+                      setImageZoom(prev => Math.max(1, Math.min(4, prev + delta)));
+                      if (imageZoom + delta <= 1) {
+                        setImagePosition({ x: 0, y: 0 });
+                      }
+                    }
+                  }
+                }}
+                onDoubleClick={() => {
+                  setImageZoom(1);
+                  setImagePosition({ x: 0, y: 0 });
+                }}
+              >
                 <Box
                   component="img"
                   src={getImageUrl(product?.images?.[selectedImageIndex]?.image_path)}
@@ -415,10 +767,63 @@ const ProductView = () => {
                   sx={{
                     width: "100%",
                     height: "100%",
-                    objectFit: "cover",
-                    borderRadius: 2
+                    objectFit: "contain",
+                    borderRadius: 2,
+                    transform: `scale(${imageZoom}) translate(${imagePosition.x / imageZoom}px, ${imagePosition.y / imageZoom}px)`,
+                    transformOrigin: "center center",
+                    transition: imageZoom === 1 && !isDragging ? "transform 0.3s ease" : "none",
+                    imageRendering: "auto",
+                    WebkitImageRendering: "auto",
+                    willChange: imageZoom > 1 ? "transform" : "auto"
                   }}
                 />
+                
+                {/* Hover Zoom Overlay - Larger rectangular view for better fabric detail */}
+                {hoverZoom.show && imageZoom === 1 && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: { xs: "auto", md: mousePosition.y - 150 },
+                      bottom: { xs: 20, md: "auto" },
+                      left: { xs: "50%", md: mousePosition.x - 200 },
+                      transform: { xs: "translateX(-50%)", md: "none" },
+                      width: { xs: "90%", md: 400 },
+                      height: { xs: 300, md: 300 },
+                      border: "3px solid #000",
+                      borderRadius: 2,
+                      pointerEvents: "none",
+                      zIndex: 10,
+                      background: `url(${getImageUrl(product?.images?.[selectedImageIndex]?.image_path)})`,
+                      backgroundSize: "300%",
+                      backgroundPosition: `${hoverZoom.x}% ${hoverZoom.y}%`,
+                      backgroundRepeat: "no-repeat",
+                      boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                      display: { xs: "none", md: "block" },
+                      overflow: "hidden"
+                    }}
+                  />
+                )}
+                
+                {/* Zoom Indicator */}
+                {imageZoom > 1 && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: 16,
+                      right: 16,
+                      backgroundColor: "rgba(0,0,0,0.7)",
+                      color: "white",
+                      px: 2,
+                      py: 1,
+                      borderRadius: 2,
+                      fontSize: "0.875rem",
+                      zIndex: 10,
+                      pointerEvents: "none"
+                    }}
+                  >
+                    {Math.round(imageZoom * 100)}% • Drag to pan • Double-click to reset
+                  </Box>
+                )}
                 
                 {/* Navigation Arrows */}
                 {product?.images?.length > 1 && (
@@ -456,31 +861,48 @@ const ProductView = () => {
           </Box>
 
           {/* Right Side - Product Details */}
-          <Box sx={{ flex: { xs: 1, lg: "0 0 400px" }, pl: { lg: 4 } }}>
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 0, background: "#fff" }}>
-              <Typography variant="h4" sx={{ fontWeight: 550, mb: 1, fontSize: "1rem", lineHeight: 1.3 }}>
+          <Box sx={{ flex: { xs: 1, lg: "0 0 350px" }, pl: { lg: 1 } }}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 0, background: "#fff" }}>
+              <Typography variant="h4" sx={{ fontWeight: 550, mb: 0.5, fontSize: "1rem", lineHeight: 1.3 }}>
                 {product?.name}
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 550, mb: 3, fontSize: "1rem", color: "#000" }}>
-                ₨{product?.sale_price || product?.price}
+              <Typography variant="h5" sx={{ fontWeight: 550, mb: 2, fontSize: "1rem", color: "#000" }}>
+                ₨{(() => {
+                  // If size and color are selected, find the specific variant
+                  if (selectedSize && selectedColor) {
+                    const selectedVariant = product?.variants?.find(variant => 
+                      variant.size === selectedSize && variant.color === selectedColor
+                    );
+                    return selectedVariant?.sale_price || selectedVariant?.price || 0;
+                  }
+                  
+                  // If no size/color selected, show first variant price or product price
+                  if (product?.variants && product.variants.length > 0) {
+                    const firstVariant = product.variants[0];
+                    return firstVariant?.sale_price || firstVariant?.price || 0;
+                  }
+                  
+                  // Fallback to product-level pricing
+                  return product?.sale_price || product?.price || 0;
+                })()}
               </Typography>
 
 
               {/* Size Selection */}
-              {product?.sizes?.length > 0 && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, fontSize: { xs: "0.9rem", sm: "0.875rem" } }}>Size</Typography>
+              {getAvailableSizes().length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: { xs: "0.9rem", sm: "0.875rem" } }}>Size</Typography>
                   <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} flexWrap="wrap">
-                    {product.sizes.map((size, idx) => (
+                    {getAvailableSizes().map((size, idx) => (
                       <Button
                         key={idx}
                         variant={selectedSize === size ? "contained" : "outlined"}
                         onClick={() => handleSizeChange(size)}
                         sx={{
-                          minWidth: { xs: 35, sm: 40 },
-                          height: { xs: 35, sm: 40 },
-                          borderRadius: "20px",
-                          fontSize: { xs: "0.75rem", sm: "0.85rem" },
+                          minWidth: { xs: 32, sm: 36 },
+                          height: { xs: 32, sm: 36 },
+                          borderRadius: "18px",
+                          fontSize: { xs: "0.75rem", sm: "0.8rem" },
                           backgroundColor: selectedSize === size ? "#000" : "transparent",
                           color: selectedSize === size ? "#fff" : "#000",
                           borderColor: "#000",
@@ -499,24 +921,42 @@ const ProductView = () => {
                   {sizeError}
                 </Typography>
               )}
+              <Button
+                variant="text"
+                onClick={() => setSizeChartOpen(true)}
+                sx={{
+                  mt: 1,
+                  fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                  color: "#666",
+                  textTransform: "none",
+                  "&:hover": {
+                    backgroundColor: "transparent",
+                    color: "#000"
+                  }
+                }}
+                startIcon={<Help sx={{ fontSize: "0.9rem" }} />}
+              >
+                Size Chart
+              </Button>
           </Box>
         )}
 
               {/* Color Selection */}
-              {product?.colors?.length > 0 && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, fontSize: { xs: "0.9rem", sm: "0.875rem" } }}>Color</Typography>
-                  <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} flexWrap="wrap">
-              {product.colors.map((color, idx) => (
+              {getAvailableColors().length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: { xs: "0.9rem", sm: "0.875rem" } }}>Color</Typography>
+                  <Stack direction="row" spacing={{ xs: 1, sm: 1,md:2 }} flexWrap="wrap" rowGap={{ xs: 0.5, md: 1.5 }}>
+              {getAvailableColors().map((color, idx) => (
                       <Button
                   key={idx} 
                         variant={selectedColor === color ? "contained" : "outlined"}
                   onClick={() => handleColorChange(color)}
                         sx={{
-                          minWidth: { xs: 40, sm: 50 },
-                          height: { xs: 30, sm: 35 },
-                          borderRadius: "20px",
-                          fontSize: { xs: "0.55rem", sm: "0.75rem" },
+                          width: 65,
+                          minWidth: { xs: 35, sm: 45, md: 65 },
+                          height: { xs: 28, sm: 28, md: 28 },
+                          borderRadius: "18px",
+                          fontSize: { xs: "0.55rem", sm: "0.7rem" },
                           backgroundColor: selectedColor === color ? "#000" : "transparent",
                           color: selectedColor === color ? "#fff" : "#000",
                           borderColor: "#000",
@@ -538,9 +978,22 @@ const ProductView = () => {
                 </Box>
               )}
 
+              {/* Stock indicator */}
+              {selectedSize && selectedColor && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ 
+                    color: getCurrentStock() > 0 ? 'success.main' : 'error.main',
+                    fontSize: { xs: "0.85rem", sm: "0.875rem" },
+                    fontWeight: 500
+                  }}>
+                    {getCurrentStock() > 0 ? `${getCurrentStock()} items available` : 'Out of stock'}
+                  </Typography>
+                </Box>
+              )}
+
               {/* Quantity */}
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>Quantity</Typography>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>Quantity</Typography>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <IconButton 
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -550,13 +1003,34 @@ const ProductView = () => {
             </IconButton>
                   <Typography sx={{ mx: 2, minWidth: 40, textAlign: "center" }}>{quantity}</Typography>
                   <IconButton 
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => {
+                      const currentStock = getCurrentStock();
+                      
+                      if (currentStock === 0) {
+                        setStockErrorMessage("This variant is out of stock");
+                        setTimeout(() => setStockErrorMessage(""), 3000);
+                        return;
+                      }
+                      if (quantity + 1 > currentStock) {
+                        setStockErrorMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+                        setTimeout(() => setStockErrorMessage(""), 3000);
+                        return;
+                      }
+                      setQuantity(quantity + 1);
+                    }}
                     sx={{ border: "1px solid #e0e0e0", borderRadius: 1 }}
                   >
               +
             </IconButton>
                 </Box>
                 </Box>
+
+              {/* Stock Error Message */}
+              {stockErrorMessage && (
+                <Alert severity="error" sx={{ mb: 1.5, fontSize: "0.8rem" }}>
+                  {stockErrorMessage}
+                </Alert>
+              )}
 
               {/* Add to Cart Button */}
           <Button 
@@ -565,8 +1039,8 @@ const ProductView = () => {
             onClick={handleAddToCart} 
             disabled={!areAllOptionsSelected()}
             sx={{
-              mb: 2, 
-              py: 1.5, 
+              mb: 1.5, 
+              py: 1, 
               backgroundColor: areAllOptionsSelected() ? "#000" : "#666", 
               "&:hover": { 
                 backgroundColor: areAllOptionsSelected() ? "#333" : "#666" 
@@ -583,17 +1057,31 @@ const ProductView = () => {
             {getButtonText()}
           </Button>
 
-              {/* Size Guide */}
-              <Button 
-                variant="text" 
-                sx={{ 
-                  mb: 2, 
-                  color: "#000", 
-                  textTransform: "none",
-                  fontSize: "0.85rem"
-                }}
-              >
-                SIZE GUIDE ↓
+              {/* Checkout Button */}
+          <Button 
+            variant="outlined" 
+            fullWidth 
+            onClick={handleCheckout} 
+            disabled={!areAllOptionsSelected()}
+            sx={{
+              mb: 1.5, 
+              py: 1, 
+              borderColor: areAllOptionsSelected() ? "#000" : "#666", 
+              color: areAllOptionsSelected() ? "#000" : "#666",
+              "&:hover": { 
+                borderColor: areAllOptionsSelected() ? "#333" : "#666",
+                backgroundColor: areAllOptionsSelected() ? "#f5f5f5" : "transparent"
+              },
+              "&:disabled": {
+                borderColor: "#666",
+                color: "#666"
+              },
+              fontSize: "0.9rem",
+              fontWeight: 600,
+              textTransform: "uppercase"
+            }}
+          >
+            BUY IT NOW
           </Button>
 
               {/* Product Description */}
@@ -602,7 +1090,7 @@ const ProductView = () => {
               lineHeight: 1.5, 
                   color: "text.secondary", 
                   fontSize: "0.9rem",
-                  mb: 2
+                  mb: 1.5
             }}>
                     {product.description}
                   </Typography>
@@ -622,32 +1110,6 @@ const ProductView = () => {
       </Box>
 
 
-       {/* Success Message */}
-       <Snackbar 
-         open={showSuccessMessage} 
-         autoHideDuration={3000} 
-         onClose={() => setShowSuccessMessage(false)}
-         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-         sx={{ 
-           top: { xs: '80px !important', md: '100px !important' },
-           left: { xs: '16px !important', md: 'auto !important' },
-           right: { xs: '16px !important', md: 'auto !important' },
-           width: { xs: 'calc(100% - 32px) !important', md: 'auto !important' }
-         }}
-       >
-         <Alert 
-           severity="success" 
-                          sx={{
-             width: '100%', 
-             fontSize: { xs: '0.85rem', md: '0.9rem' },
-             '& .MuiAlert-message': {
-               fontSize: { xs: '0.85rem', md: '0.9rem' }
-             }
-           }}
-         >
-           Product has been added to cart
-         </Alert>
-       </Snackbar>
 
        {/* Cart Drawer */}
        <Drawer
@@ -709,11 +1171,38 @@ const ProductView = () => {
                }}>
                  {selectedSize && `Size: ${selectedSize}`} {selectedColor && `• Color: ${selectedColor}`}
                </Typography>
+               {selectedSize && selectedColor && (
+                 <Typography variant="body2" sx={{ 
+                   color: getCurrentStock() > 0 ? 'success.main' : 'error.main',
+                   fontSize: { xs: '0.85rem', md: '0.8rem' },
+                   mb: { xs: 1, sm: 0.5 },
+                   fontWeight: 500
+                 }}>
+                   {getCurrentStock() > 0 ? `${getCurrentStock()} items available` : 'Out of stock'}
+                 </Typography>
+               )}
                <Typography variant="body2" sx={{ 
                  fontWeight: 600, 
                  fontSize: { xs: '0.9rem', md: '0.85rem' }
                }}>
-                 ₨{product?.sale_price || product?.price} × {quantity}
+                 ₨{(() => {
+                   // If size and color are selected, find the specific variant
+                   if (selectedSize && selectedColor) {
+                     const selectedVariant = product?.variants?.find(variant => 
+                       variant.size === selectedSize && variant.color === selectedColor
+                     );
+                     return selectedVariant?.sale_price || selectedVariant?.price || 0;
+                   }
+                   
+                   // If no size/color selected, show first variant price or product price
+                   if (product?.variants && product.variants.length > 0) {
+                     const firstVariant = product.variants[0];
+                     return firstVariant?.sale_price || firstVariant?.price || 0;
+                   }
+                   
+                   // Fallback to product-level pricing
+                   return product?.sale_price || product?.price || 0;
+                 })()} × {quantity}
                           </Typography>
                         </Box>
                     </Box>
@@ -739,7 +1228,26 @@ const ProductView = () => {
              fontWeight: 600, 
              fontSize: { xs: '1rem', md: '0.9rem' }
            }}>
-             ₨{((product?.sale_price || product?.price) * quantity).toLocaleString()}
+             ₨{(() => {
+               let unitPrice = 0;
+               
+               // If size and color are selected, find the specific variant
+               if (selectedSize && selectedColor) {
+                 const selectedVariant = product?.variants?.find(variant => 
+                   variant.size === selectedSize && variant.color === selectedColor
+                 );
+                 unitPrice = selectedVariant?.sale_price || selectedVariant?.price || 0;
+               } else if (product?.variants && product.variants.length > 0) {
+                 // If no size/color selected, show first variant price
+                 const firstVariant = product.variants[0];
+                 unitPrice = firstVariant?.sale_price || firstVariant?.price || 0;
+               } else {
+                 // Fallback to product-level pricing
+                 unitPrice = product?.sale_price || product?.price || 0;
+               }
+               
+               return (unitPrice * quantity).toLocaleString();
+             })()}
                   </Typography>
                 </Box>
 
@@ -777,33 +1285,91 @@ const ProductView = () => {
                   </Button>
        </Drawer>
 
-       {/* Related Products Section */}
-      <Box sx={{ maxWidth: 1200, mx: "auto", px: 3, mb: 6, py: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 600, mb: 4, textAlign: "center" }}>
-           Related Products
-         </Typography>
+       {/* Related Products Section - Carousel */}
+      <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 2, sm: 3 }, mb: 6, py: 2 }}>
+        {/* Header with Navigation */}
+        <Box sx={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          mb: 4,
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 2, sm: 0 }
+        }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, textAlign: { xs: "center", sm: "left" } }}>
+            YOU MAY ALSO LIKE
+          </Typography>
+          
+          {/* Navigation Arrows */}
+          {relatedProducts.length > 0 && (
+            <Box sx={{ display: "flex", gap: 1, justifyContent: { xs: "center", sm: "flex-end" } }}>
+              <IconButton
+                onClick={handleRelatedPrevious}
+                disabled={relatedCarouselIndex === 0}
+                sx={{
+                  backgroundColor: "white",
+                  border: "1px solid #e0e0e0",
+                  width: { xs: 36, sm: 40 },
+                  height: { xs: 36, sm: 40 },
+                  "&:hover": {
+                    backgroundColor: "#f5f5f5",
+                  },
+                  "&:disabled": {
+                    backgroundColor: "#f5f5f5",
+                    color: "#ccc",
+                  },
+                }}
+              >
+                <ArrowBackIosIcon sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
+              </IconButton>
+              <IconButton
+                onClick={handleRelatedNext}
+                disabled={(() => {
+                  const itemsPerView = relatedScreenSize === 'mobile' ? 2 : 
+                                      relatedScreenSize === 'tablet' ? 2 : 
+                                      relatedScreenSize === 'desktop' ? 3 : 4;
+                  return relatedCarouselIndex >= relatedProducts.length - itemsPerView;
+                })()}
+                sx={{
+                  backgroundColor: "white",
+                  border: "1px solid #e0e0e0",
+                  width: { xs: 36, sm: 40 },
+                  height: { xs: 36, sm: 40 },
+                  "&:hover": {
+                    backgroundColor: "#f5f5f5",
+                  },
+                  "&:disabled": {
+                    backgroundColor: "#f5f5f5",
+                    color: "#ccc",
+                  },
+                }}
+              >
+                <ArrowForwardIosIcon sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
+              </IconButton>
+            </Box>
+          )}
+        </Box>
          
         {relatedLoading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
             <CircularProgress />
-             </Box>
+          </Box>
         ) : relatedProducts.length > 0 ? (
           <Box
             sx={{
               display: "grid",
               gridTemplateColumns: {
                 xs: "repeat(2, 1fr)",
-                sm: "repeat(3, 1fr)",
-                md: "repeat(4, 1fr)",
+                sm: "repeat(2, 1fr)",
+                md: "repeat(3, 1fr)",
                 lg: "repeat(4, 1fr)",
-                xl: "repeat(4, 1fr)",
               },
-              gap: { xs: 1.5, sm: 2, md: 2.5, lg: 3 },
-              px: { xs: 1, sm: 2, md: 2, lg: 3 },
-              py: { xs: 1, sm: 2 },
+              gap: { xs: 1.5, sm: 2.5, md: 3 },
+              px: { xs: 0, sm: 1 },
+              overflow: "hidden",
             }}
           >
-            {relatedProducts.map((relatedProduct) => {
+            {getVisibleRelatedProducts().map((relatedProduct) => {
               const discountPercentage = (() => {
                 if (!relatedProduct.price || !relatedProduct.sale_price || relatedProduct.sale_price >= relatedProduct.price) return 0;
                 return Math.round(((relatedProduct.price - relatedProduct.sale_price) / relatedProduct.price) * 100);
@@ -998,7 +1564,7 @@ const ProductView = () => {
                           mb: 0.5
                         }}
                       >
-                        ₨{relatedProduct?.sale_price || relatedProduct?.price || 0}
+                        ₨{relatedProduct?.variants?.[0]?.sale_price || relatedProduct?.variants?.[0]?.price || relatedProduct?.sale_price || relatedProduct?.price || 0}
                       </Typography>
                       
                       {/* Stock Status - Red/Green color */}
@@ -1012,7 +1578,7 @@ const ProductView = () => {
                             if (relatedProduct.variants && relatedProduct.variants.length > 0) {
                               // Use variant inventory
                               totalStock = relatedProduct.variants.reduce((sum, variant) => {
-                                return sum + (variant.inventory?.quantity || 0);
+                                return sum + (variant.quantity || 0);
                               }, 0);
                             } else {
                               // Fallback to legacy inventory fields
@@ -1033,7 +1599,7 @@ const ProductView = () => {
                           if (relatedProduct.variants && relatedProduct.variants.length > 0) {
                             // Use variant inventory
                             totalStock = relatedProduct.variants.reduce((sum, variant) => {
-                              return sum + (variant.inventory?.quantity || 0);
+                              return sum + (variant.quantity || 0);
                             }, 0);
                           } else {
                             // Fallback to legacy inventory fields
@@ -1074,10 +1640,21 @@ const ProductView = () => {
         product={modalProduct}
       />
 
+      {/* Size Chart Drawer */}
+      <SizeChartDrawer
+        open={sizeChartOpen}
+        onClose={() => setSizeChartOpen(false)}
+        selectedSize={selectedSize}
+        productCategory={product?.category?.name}
+        availableSizes={product?.sizes}
+      />
+
        {/* Footer */}
        <Footer />
+      </Box>
     </Box>
   );
 };
 
 export default ProductView;
+                     

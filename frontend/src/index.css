@@ -13,8 +13,14 @@
   -moz-osx-font-smoothing: grayscale;
   
 }
-
-
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;     /* ONLY HTML SCROLLS */
+}
 a {
   font-weight: 500;
   color: #e6ac00;
@@ -24,12 +30,17 @@ a:hover {
   color: #e6ac00;
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  padding: 0;
+/* Prevent extra scrollbars */
+* {
+  box-sizing: border-box;
+}
+
+#root {
   width: 100%;
-  overflow-x: hidden;
+  max-width: 100%;
+  margin: 0;
+  position: relative;
+  display: block;
 }
 
 h1 {

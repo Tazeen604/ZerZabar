@@ -48,7 +48,7 @@ const Sidebar = ({ open, onToggle }) => {
     {
       text: 'Products',
       icon: <Inventory />,
-      path: '/admin/products',
+      path: '/admin/product-management',
       hasSubmenu: true,
       subItems: [
         { text: 'Product Management', path: '/admin/product-management' },
@@ -80,7 +80,11 @@ const Sidebar = ({ open, onToggle }) => {
       text: 'Settings',
       icon: <Settings />,
       path: '/admin/settings',
-      hasSubmenu: false,
+      hasSubmenu: true,
+      subItems: [
+        { text: 'General Settings', path: '/admin/settings' },
+        { text: 'Homepage Settings', path: '/admin/homepage-settings' },
+      ],
     },
   ];
 

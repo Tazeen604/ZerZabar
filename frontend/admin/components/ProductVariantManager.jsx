@@ -1,372 +1,418 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
+  Button,
+  Chip,
+  Alert,
+  Grid,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Chip,
-  Alert,
-  Snackbar,
-  CircularProgress,
-  Tooltip,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormLabel,
+  Card,
+  CardContent,
+  Divider,
+  IconButton,
 } from '@mui/material';
-import {
-  Add,
-  Edit,
-  Delete,
-  Inventory,
-  Warning,
-  CheckCircle,
-  Cancel,
-} from '@mui/icons-material';
-import apiService from '../../src/services/api';
+import { Add, Delete, Warning } from '@mui/icons-material';
 
-const ProductVariantManager = ({ productId, onVariantsChange }) => {
-  const [variants, setVariants] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [editingVariant, setEditingVariant] = useState(null);
-  const [formData, setFormData] = useState({
-    color: '',
+const ProductVariantManager = ({
+  variants,
+  onVariantsChange,
+  availableSizes = [],
+  availableColors = [],
+}) => {
+  const [currentVariant, setCurrentVariant] = useState({
     size: '',
-    sku: '',
+    color: '',
+    quantity: '',
     price: '',
     sale_price: '',
-    quantity: 0,
-    cost_price: '',
+    sku: '',
   });
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    if (productId) {
-      fetchVariants();
+  const generateSKU = (size, color) => {
+    if (size && color) {
+      return `${size.toUpperCase()}-${color.toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
     }
-  }, [productId]);
-
-  const fetchVariants = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.get(`/admin/products/${productId}/variants`);
-      if (response.success) {
-        setVariants(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching variants:', error);
-      showSnackbar('Failed to fetch variants', 'error');
-    } finally {
-      setLoading(false);
-    }
+    return '';
   };
 
-  const handleCreateVariant = () => {
-    setEditingVariant(null);
-    setFormData({
-      color: '',
+  const validateVariant = () => {
+    const newErrors = {};
+    
+    if (!currentVariant.size) {
+      newErrors.size = 'Size is required';
+    }
+    if (!currentVariant.color) {
+      newErrors.color = 'Color is required';
+    }
+    const quantityNum = parseInt(currentVariant.quantity, 10);
+    if (!quantityNum || quantityNum <= 0) {
+      newErrors.quantity = 'Quantity must be greater than 0';
+    }
+    const priceNum = parseFloat(currentVariant.price);
+    if (!priceNum || priceNum <= 0) {
+      newErrors.price = 'Price must be greater than 0';
+    }
+    const saleNum = currentVariant.sale_price !== '' && currentVariant.sale_price !== null
+      ? parseFloat(currentVariant.sale_price)
+      : NaN;
+    if (!isNaN(saleNum)) {
+      if (saleNum <= 0) {
+        newErrors.sale_price = 'Selling price must be greater than 0';
+      } else if (!isNaN(priceNum) && saleNum >= priceNum) {
+        newErrors.sale_price = 'Selling price must be less than regular price';
+      }
+    }
+
+    // Check for duplicate size-color combination
+    const duplicate = variants.find(
+      v => v.size === currentVariant.size && v.color === currentVariant.color
+    );
+    if (duplicate) {
+      newErrors.duplicate = `Variant with ${currentVariant.size} - ${currentVariant.color} already exists`;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleAddVariant = () => {
+    if (!validateVariant()) {
+      return;
+    }
+
+    const sku = generateSKU(currentVariant.size, currentVariant.color);
+    const newVariant = {
+      ...currentVariant,
+      quantity: parseInt(currentVariant.quantity) || 0,
+      price: Number.isFinite(parseFloat(currentVariant.price)) ? Math.round(parseFloat(currentVariant.price)) : 0,
+      sale_price: currentVariant.sale_price !== '' && currentVariant.sale_price !== null
+        ? Math.round(parseFloat(currentVariant.sale_price))
+        : null,
+      sku,
+    };
+
+    onVariantsChange([...variants, newVariant]);
+
+    // Reset form
+    setCurrentVariant({
       size: '',
-      sku: '',
+      color: '',
+      quantity: '',
       price: '',
       sale_price: '',
-      quantity: 0,
-      cost_price: '',
+      sku: '',
     });
-    setOpenDialog(true);
+    setErrors({});
   };
 
-  const handleEditVariant = (variant) => {
-    setEditingVariant(variant);
-    setFormData({
-      color: variant.color || '',
-      size: variant.size || '',
-      sku: variant.sku || '',
-      price: variant.price || '',
-      sale_price: variant.sale_price || '',
-      quantity: variant.quantity || 0,
-      cost_price: variant.cost_price || '',
-    });
-    setOpenDialog(true);
+  const handleRemoveVariant = (index) => {
+    const updatedVariants = variants.filter((_, i) => i !== index);
+    onVariantsChange(updatedVariants);
   };
 
-  const handleSaveVariant = async () => {
-    try {
-      setLoading(true);
+  const handleFieldChange = (field, value) => {
+    setCurrentVariant(prev => {
+      const updated = {
+        ...prev,
+        [field]: value
+      };
       
-      if (editingVariant) {
-        // Update existing variant
-        await apiService.put(`/admin/variants/${editingVariant.id}`, {
-          color: formData.color,
-          size: formData.size,
-          sku: formData.sku,
-          price: formData.price,
-          sale_price: formData.sale_price,
-        });
-        showSnackbar('Variant updated successfully', 'success');
-      } else {
-        // Create new variant
-        await apiService.post(`/admin/products/${productId}/variants`, formData);
-        showSnackbar('Variant created successfully', 'success');
+      // Auto-generate SKU when size or color changes
+      if (field === 'size' || field === 'color') {
+        const newSize = field === 'size' ? value : prev.size;
+        const newColor = field === 'color' ? value : prev.color;
+        updated.sku = generateSKU(newSize, newColor);
       }
       
-      setOpenDialog(false);
-      fetchVariants();
-      onVariantsChange && onVariantsChange();
-    } catch (error) {
-      console.error('Error saving variant:', error);
-      showSnackbar('Failed to save variant', 'error');
-    } finally {
-      setLoading(false);
+      return updated;
+    });
+    
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
-
-  const handleDeleteVariant = async (variant) => {
-    if (window.confirm('Are you sure you want to delete this variant?')) {
-      try {
-        setLoading(true);
-        await apiService.delete(`/admin/variants/${variant.id}`);
-        showSnackbar('Variant deleted successfully', 'success');
-        fetchVariants();
-        onVariantsChange && onVariantsChange();
-      } catch (error) {
-        console.error('Error deleting variant:', error);
-        showSnackbar('Failed to delete variant', 'error');
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleAdjustInventory = async (variant, adjustment) => {
-    try {
-      setLoading(true);
-      await apiService.post(`/admin/variants/${variant.id}/adjust-inventory`, adjustment);
-      showSnackbar('Inventory adjusted successfully', 'success');
-      fetchVariants();
-      onVariantsChange && onVariantsChange();
-    } catch (error) {
-      console.error('Error adjusting inventory:', error);
-      showSnackbar('Failed to adjust inventory', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const showSnackbar = (message, severity) => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const getStockStatus = (variant) => {
-    if (variant.quantity <= 0) return { status: 'out_of_stock', color: 'error', icon: <Cancel /> };
-    if (variant.quantity <= 10) return { status: 'low_stock', color: 'warning', icon: <Warning /> };
-    return { status: 'in_stock', color: 'success', icon: <CheckCircle /> };
-  };
-
-  const getStockStatusText = (status) => {
-    switch (status) {
-      case 'out_of_stock': return 'Out of Stock';
-      case 'low_stock': return 'Low Stock';
-      case 'in_stock': return 'In Stock';
-      default: return 'Unknown';
-    }
-  };
-
-  if (loading && variants.length === 0) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Product Variants</Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={handleCreateVariant}
-          sx={{ backgroundColor: '#1976d2' }}
-        >
-          Add Variant
-        </Button>
-      </Box>
+      <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>
+        Product Variants
+      </Typography>
 
-      {variants.length === 0 ? (
-        <Alert severity="info">
-          No variants found. Create variants to manage different sizes, colors, and inventory levels.
+      {/* Add Variant Form */}
+      <Card sx={{ mb: 3, backgroundColor: '#f9f9f9' }}>
+        <CardContent>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+            Add New Variant
+          </Typography>
+
+          {errors.duplicate && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errors.duplicate}
         </Alert>
-      ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>SKU</TableCell>
-                <TableCell>Color</TableCell>
-                <TableCell>Size</TableCell>
-                <TableCell>Price</TableCell>
-                <TableCell>Sale Price</TableCell>
-                <TableCell>Quantity</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {variants.map((variant) => {
-                const stockStatus = getStockStatus(variant);
-                return (
-                  <TableRow key={variant.id}>
-                    <TableCell>{variant.sku}</TableCell>
-                    <TableCell>
-                      {variant.color && (
-                        <Chip
-                          label={variant.color}
-                          size="small"
-                          sx={{ backgroundColor: variant.color.toLowerCase(), color: 'white' }}
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>{variant.size}</TableCell>
-                    <TableCell>₨{variant.price}</TableCell>
-                    <TableCell>{variant.sale_price ? `₨${variant.sale_price}` : '-'}</TableCell>
-                    <TableCell>{variant.quantity}</TableCell>
-                    <TableCell>
-                      <Chip
-                        icon={stockStatus.icon}
-                        label={getStockStatusText(stockStatus.status)}
-                        color={stockStatus.color}
-                        size="small"
+          )}
+
+          <Grid container spacing={3}>
+            {/* Size Selection */}
+            <Grid item xs={12}>
+              <FormControl fullWidth error={!!errors.size}>
+                <InputLabel>Size *</InputLabel>
+                <Select
+                  value={currentVariant.size}
+                  onChange={(e) => handleFieldChange('size', e.target.value)}
+                  label="Size *"
+                >
+                  <MenuItem value="">
+                    <em>Select a size</em>
+                  </MenuItem>
+                  {availableSizes.map((size) => (
+                    <MenuItem key={size} value={size}>
+                      {size}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {errors.size && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                    {errors.size}
+                  </Typography>
+                )}
+              </FormControl>
+              {availableSizes.length > 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  Available sizes: {availableSizes.join(', ')}
+                </Typography>
+              )}
+            </Grid>
+
+            {/* Color Radio Buttons */}
+            <Grid item xs={12}>
+              <FormControl component="fieldset" error={!!errors.color} fullWidth>
+                <FormLabel component="legend" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  Color *
+                </FormLabel>
+                <RadioGroup
+                  value={currentVariant.color}
+                  onChange={(e) => handleFieldChange('color', e.target.value)}
+                  sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'row', 
+                    flexWrap: 'wrap',
+                    gap: 2
+                  }}
+                >
+                  {availableColors.map((color) => (
+                    <FormControlLabel
+                      key={color.name}
+                      value={color.name}
+                      control={<Radio />}
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box
+                            sx={{
+                              width: 20,
+                              height: 20,
+                              backgroundColor: color.hex || '#ccc',
+                              borderRadius: '50%',
+                              mr: 1,
+                              border: '2px solid #ddd'
+                            }}
+                          />
+                          {color.name}
+                        </Box>
+                      }
+                      sx={{
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 1,
+                        px: 2,
+                        py: 0.5,
+                        mr: 0,
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                        }
+                      }}
+                    />
+                  ))}
+                </RadioGroup>
+                {errors.color && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                    {errors.color}
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+
+            {/* Quantity */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Quantity *"
+                type="number"
+                value={currentVariant.quantity}
+                onChange={(e) => handleFieldChange('quantity', e.target.value)}
+                error={!!errors.quantity}
+                helperText={errors.quantity}
+                inputProps={{ min: 0 }}
+              />
+            </Grid>
+
+            {/* Price */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Price *"
+                type="number"
+                value={currentVariant.price}
+                onChange={(e) => handleFieldChange('price', e.target.value)}
+                error={!!errors.price}
+                helperText={errors.price}
+                inputProps={{ min: 0, step: 1 }}
+              />
+            </Grid>
+
+            {/* Selling Price */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Selling Price (Optional)"
+                type="number"
+                value={currentVariant.sale_price}
+                onChange={(e) => handleFieldChange('sale_price', e.target.value)}
+                error={!!errors.sale_price}
+                helperText={errors.sale_price || "Leave empty to use regular price"}
+                inputProps={{ min: 0, step: 1 }}
+              />
+            </Grid>
+
+            {/* SKU */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="SKU"
+                value={currentVariant.sku}
+                onChange={(e) => {
+                  const trimmedValue = e.target.value.trim();
+                  handleFieldChange('sku', trimmedValue);
+                }}
+                error={!!errors.sku}
+                helperText={errors.sku || "Auto-generated based on size and color, but editable"}
+                placeholder="Auto-generated SKU"
+                sx={{
+                  '& .MuiInputBase-input': {
+                    textTransform: 'uppercase',
+                  },
+                }}
+              />
+            </Grid>
+
+            {/* Add Variant Button */}
+            <Grid item xs={12}>
+          <Button
+            variant="contained"
+                startIcon={<Add />}
+                onClick={handleAddVariant}
+                sx={{
+                  backgroundColor: '#FFD700',
+                  color: '#000',
+                  fontWeight: 'bold',
+                  '&:hover': {
+                    backgroundColor: '#FFC700',
+                  }
+                }}
+              >
+                Add Variant
+          </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Added Variants List */}
+      {variants.length > 0 && (
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+            Added Variants ({variants.length})
+          </Typography>
+
+          <Grid container spacing={2}>
+            {variants.map((variant, index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Card sx={{ position: 'relative' }}>
+                  <CardContent>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRemoveVariant(index)}
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        color: '#f44336'
+                      }}
+                    >
+                      <Delete />
+                    </IconButton>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <Box
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          backgroundColor: availableColors.find(c => c.name === variant.color)?.hex || '#ccc',
+                          borderRadius: '50%',
+                          mr: 1,
+                          border: '2px solid #ddd'
+                        }}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="Edit Variant">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditVariant(variant)}
-                        >
-                          <Edit />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Variant">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteVariant(variant)}
-                          color="error"
-                        >
-                          <Delete />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        {variant.size}
+                      </Typography>
+                    </Box>
+
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      Color: {variant.color}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      Quantity: {variant.quantity}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      Price: Rs{variant.price}
+                    </Typography>
+                    {variant.sale_price && (
+                      <Typography variant="body2" color="primary" sx={{ mb: 0.5, fontWeight: 'bold' }}>
+                        Sale Price: Rs{variant.sale_price}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                      SKU: {variant.sku}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
       )}
 
-      {/* Variant Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingVariant ? 'Edit Variant' : 'Create New Variant'}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-            <TextField
-              label="Color"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="Size"
-              value={formData.size}
-              onChange={(e) => setFormData({ ...formData, size: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="SKU"
-              value={formData.sku}
-              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="Price"
-              type="number"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="Sale Price"
-              type="number"
-              value={formData.sale_price}
-              onChange={(e) => setFormData({ ...formData, sale_price: e.target.value })}
-              fullWidth
-            />
-            {!editingVariant && (
-              <TextField
-                label="Initial Quantity"
-                type="number"
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                fullWidth
-                required
-              />
-            )}
-            {!editingVariant && (
-              <TextField
-                label="Cost Price"
-                type="number"
-                value={formData.cost_price}
-                onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                fullWidth
-              />
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button
-            onClick={handleSaveVariant}
-            variant="contained"
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={20} /> : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-      >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-        >
-          {snackbar.message}
+      {variants.length === 0 && (
+        <Alert severity="info">
+          No variants added yet. Please add at least one variant.
         </Alert>
-      </Snackbar>
+      )}
     </Box>
   );
 };
 
 export default ProductVariantManager;
-

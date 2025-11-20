@@ -32,7 +32,6 @@ import {
   Inventory,
   TrendingUp,
   Security,
-  Notifications,
   Palette,
   Add,
   Edit,
@@ -58,9 +57,6 @@ const Settings = () => {
     
     // Product Settings
     max_product_images: 5,
-    
-    // Notification Settings
-    low_stock_notification: true,
     
     // Theme Settings
     default_theme: 'light',
@@ -142,14 +138,6 @@ const Settings = () => {
       color: '#2196F3',
       settings: [
         { key: 'max_product_images', label: 'Max Product Images', type: 'number', description: 'Maximum number of images allowed per product' },
-      ]
-    },
-    {
-      title: 'Notifications',
-      icon: <Notifications />,
-      color: '#F44336',
-      settings: [
-        { key: 'low_stock_notification', label: 'Low Stock Notifications', type: 'boolean', description: 'Show notifications when stock is low' },
       ]
     },
     {

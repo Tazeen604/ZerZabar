@@ -46,6 +46,8 @@ import {
   AttachMoney,
   Inventory,
   Visibility,
+  History,
+  AssignmentReturn,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiService from '../../src/services/api';
@@ -89,6 +91,14 @@ const OrderDetails = () => {
         console.log('Size and Color for first item:', {
           size: response.data.items?.[0]?.size,
           color: response.data.items?.[0]?.color
+        });
+        console.log('Shipping info:', {
+          shipping_cost: response.data.shipping_cost,
+          shipping_amount: response.data.shipping_amount,
+          shipping: response.data.shipping,
+          subtotal: response.data.subtotal,
+          total: response.data.total,
+          total_amount: response.data.total_amount
         });
         setOrder(response.data);
         setNewStatus(response.data.status);
@@ -163,6 +173,8 @@ const OrderDetails = () => {
       case 'cancelled':
       case 'canceled':
         return '#F44336';
+      case 'returned':
+        return '#9C27B0';
       default:
         return '#757575';
     }
@@ -181,6 +193,8 @@ const OrderDetails = () => {
       case 'cancelled':
       case 'canceled':
         return <Cancel />;
+      case 'returned':
+        return <AssignmentReturn />;
       default:
         return <ShoppingCart />;
     }
@@ -526,14 +540,17 @@ const OrderDetails = () => {
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Typography variant="body2" sx={{ color: '#757575' }}>
-              Subtotal: <b>{formatCurrency(order.subtotal)}</b>
+              Subtotal: <b>{formatCurrency(order.subtotal || 0)}</b>
             </Typography>
             <Typography variant="body2" sx={{ color: '#757575' }}>
-              Shipping: <b>{formatCurrency(order.shipping_cost)}</b>
+              Shipping: <b>{formatCurrency(order.shipping_amount || 0)}</b>
             </Typography>
             <Divider sx={{ my: 1 }} />
             <Typography variant="h6" sx={{ color: '#FFD700', fontWeight: 'bold' }}>
-              Total: {formatCurrency(order.total_amount)}
+              Total: {formatCurrency(
+                order.total_amount || 
+                (parseFloat(order.subtotal || 0) + parseFloat(order.shipping_cost || order.shipping_amount || order.shipping || 0))
+              )}
             </Typography>
           </Box>
         </CardContent>
@@ -541,6 +558,90 @@ const OrderDetails = () => {
     </Grid>
   </Grid>
 </Grid>
+
+      {/* Order Status History Section */}
+      <Card sx={{ mt: 3, borderRadius: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <History sx={{ mr: 1, color: '#FFD700' }} />
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#212121' }}>
+              Order Status History
+            </Typography>
+          </Box>
+          {order.status_history && order.status_history.length > 0 ? (
+            <Box sx={{ position: 'relative', pl: 3 }}>
+              {/* Timeline line */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: '20px',
+                  top: '20px',
+                  bottom: '20px',
+                  width: '2px',
+                  backgroundColor: '#E0E0E0',
+                }}
+              />
+              {order.status_history.map((historyItem, index) => (
+                <Box
+                  key={historyItem.id || index}
+                  sx={{
+                    position: 'relative',
+                    mb: 3,
+                    '&:last-child': { mb: 0 },
+                  }}
+                >
+                  {/* Timeline dot */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      left: '-26px',
+                      top: '4px',
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      backgroundColor: getStatusColor(historyItem.status),
+                      border: '2px solid white',
+                      boxShadow: '0 0 0 2px ' + getStatusColor(historyItem.status),
+                    }}
+                  />
+                  <Box sx={{ ml: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <Chip
+                        icon={getStatusIcon(historyItem.status)}
+                        label={historyItem.status?.charAt(0).toUpperCase() + historyItem.status?.slice(1) || 'Unknown'}
+                        sx={{
+                          backgroundColor: getStatusColor(historyItem.status) + '20',
+                          color: getStatusColor(historyItem.status),
+                          fontWeight: 'bold',
+                          fontSize: '0.875rem',
+                          mr: 2,
+                        }}
+                      />
+                      <Typography variant="body2" sx={{ color: '#757575' }}>
+                        {formatDate(historyItem.created_at)}
+                      </Typography>
+                    </Box>
+                    {historyItem.notes && (
+                      <Typography variant="body2" sx={{ color: '#757575', fontStyle: 'italic', ml: 1 }}>
+                        {historyItem.notes}
+                      </Typography>
+                    )}
+                    {historyItem.changed_by && historyItem.changed_by !== 'system' && (
+                      <Typography variant="caption" sx={{ color: '#9E9E9E', ml: 1, display: 'block', mt: 0.5 }}>
+                        Changed by: {historyItem.changed_by}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="body2" sx={{ color: '#757575', fontStyle: 'italic' }}>
+              No status history available
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Status Update Dialog */}
       <Dialog open={statusUpdateOpen} onClose={() => setStatusUpdateOpen(false)} maxWidth="sm" fullWidth>

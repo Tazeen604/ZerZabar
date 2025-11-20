@@ -35,28 +35,31 @@ import {
   Warning,
   TrendingFlat,
   Error,
+  Refresh,
 } from '@mui/icons-material';
 import apiService from '../../src/services/api';
 import { useApi } from '../hooks/useApi';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import EmptyState from '../components/EmptyState';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSettings } from '../contexts/SettingsContext';
 
 const Dashboard = () => {
   const { theme } = useTheme();
+  const { getSetting, getStockStatus, refreshSettings } = useSettings();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
-  const [salesSummary, setSalesSummary] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const loadDashboardData = async () => {
+      // Refresh settings first to ensure we have latest threshold values
+      await refreshSettings();
       await fetchDashboardData();
       const activities = await fetchRecentActivities();
-      const sales = await fetchSalesSummary();
       setRecentActivities(activities);
-      setSalesSummary(sales);
     };
     loadDashboardData();
   }, []);
@@ -68,7 +71,51 @@ const Dashboard = () => {
       const response = await apiService.get('/admin/reports/dashboard-stats');
       
       if (response.success) {
-        setDashboardData(response.data);
+        let dashboardData = response.data;
+        
+        // Fetch ALL inventory data (same as inventory page) to get accurate counts
+        try {
+          const inventoryResponse = await apiService.get('/admin/inventory');
+          if (inventoryResponse.success) {
+            const allProducts = inventoryResponse.data?.data || inventoryResponse.data || [];
+            
+            // Calculate accurate low stock and out of stock counts from ALL products
+            const lowStockProducts = allProducts.filter(product => {
+              // Check if ANY variant has low stock (not the total sum)
+              const hasLowStockVariant = product.variants && product.variants.some(variant => {
+                const variantQuantity = Number(variant.quantity) || 0;
+                const stockStatus = getStockStatus(variantQuantity);
+                return stockStatus.status === 'low_stock';
+              });
+              return hasLowStockVariant;
+            });
+            
+            const outOfStockProducts = allProducts.filter(product => {
+              // Check if ANY variant is out of stock (not the total sum)
+              const hasOutOfStockVariant = product.variants && product.variants.some(variant => {
+                const variantQuantity = Number(variant.quantity) || 0;
+                const stockStatus = getStockStatus(variantQuantity);
+                return stockStatus.status === 'out_of_stock';
+              });
+              return hasOutOfStockVariant;
+            });
+            
+            // Update dashboard data with accurate counts
+            dashboardData.inventory = {
+              ...dashboardData.inventory,
+              low_stock_products: lowStockProducts.length,
+              out_of_stock_products: outOfStockProducts.length,
+              total_products: allProducts.length
+            };
+            
+            // Store all products for accurate calculations
+            dashboardData.all_products = allProducts;
+          }
+        } catch (inventoryErr) {
+          console.error('Failed to fetch inventory data for accurate counts:', inventoryErr);
+        }
+        
+        setDashboardData(dashboardData);
       } else {
         setError(response.message || 'Failed to fetch dashboard data');
       }
@@ -127,27 +174,21 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch sales summary data
-  const fetchSalesSummary = async () => {
+  // Handle refresh button click
+  const handleRefresh = async () => {
+    setRefreshing(true);
     try {
-      const response = await apiService.get('/admin/reports/sales?period=daily&days=7');
-      if (response.success && response.data?.report_data) {
-        return response.data.report_data.map(item => ({
-          day: new Date(item.period).toLocaleDateString('en-US', { weekday: 'long' }),
-          date: new Date(item.period).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-          }),
-          revenue: item.total_revenue || 0,
-          orders: item.orders_count || 0
-        }));
-      }
+      await refreshSettings();
+      await fetchDashboardData();
+      const activities = await fetchRecentActivities();
+      setRecentActivities(activities);
     } catch (err) {
-      console.error('Error fetching sales summary:', err);
+      console.error('Error refreshing dashboard:', err);
+    } finally {
+      setRefreshing(false);
     }
-    return [];
   };
+
 
   // Default values for when data is null/undefined
   const getDefaultData = () => ({
@@ -174,6 +215,19 @@ const Dashboard = () => {
   });
 
   const data = dashboardData || getDefaultData();
+  
+  // Get computed total quantity for a product (same logic as inventory page)
+  const getComputedTotal = (product) => {
+    const invQty = product.inventory && typeof product.inventory.quantity !== 'undefined'
+      ? Number(product.inventory.quantity) || 0
+      : null;
+    const variantsQty = Array.isArray(product.variants)
+      ? product.variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0)
+      : null;
+    const totalQtyField = typeof product.total_quantity !== 'undefined' ? Number(product.total_quantity) || 0 : 0;
+    return invQty !== null ? invQty : (variantsQty !== null ? variantsQty : totalQtyField);
+  };
+  
 
   if (loading) {
     return <LoadingSkeleton type="dashboard" />;
@@ -194,239 +248,184 @@ const Dashboard = () => {
     );
   }
 
-  const statsData = [
-    {
-      title: 'Today\'s Orders',
-      value: data.today?.orders || 0,
-      change: `Revenue: PKR ${(data.today?.revenue || 0).toLocaleString()}`,
-      changeType: 'positive',
-      icon: <ShoppingCart />,
-      color: '#4CAF50',
-      bgColor: '#E8F5E8',
-    },
-    {
-      title: 'This Month Revenue',
-      value: `PKR ${(data.this_month?.revenue || 0).toLocaleString()}`,
-      change: `${data.this_month?.orders || 0} orders`,
-      changeType: 'positive',
-      icon: <AttachMoney />,
-      color: '#2196F3',
-      bgColor: '#E3F2FD',
-    },
-    {
-      title: 'Low Stock Items',
-      value: data.inventory?.low_stock || 0,
-      change: `${data.inventory?.out_of_stock || 0} out of stock`,
-      changeType: data.inventory?.low_stock > 0 ? 'negative' : 'positive',
-      icon: <Warning />,
-      color: '#FF9800',
-      bgColor: '#FFF3E0',
-    },
-    {
-      title: 'Total Variants',
-      value: data.inventory?.total_variants || 0,
-      change: `${data.inventory?.active_variants || 0} active`,
-      changeType: 'positive',
-      icon: <Inventory />,
-      color: '#9C27B0',
-      bgColor: '#F3E5F5',
-    },
-    {
-      title: 'Growth Rate',
-      value: `${data.growth?.revenue_growth || 0}%`,
-      change: `Orders: ${data.growth?.orders_growth || 0}%`,
-      changeType: data.growth?.revenue_growth >= 0 ? 'positive' : 'negative',
-      icon: data.growth?.revenue_growth >= 0 ? <TrendingUp /> : <TrendingDown />,
-      color: data.growth?.revenue_growth >= 0 ? '#4CAF50' : '#F44336',
-      bgColor: data.growth?.revenue_growth >= 0 ? '#E8F5E8' : '#FFEBEE',
-    },
-  ];
+  const statsData = [];
 
 
-  const topProducts = [
-    { name: 'Premium T-Shirt', sales: 245, revenue: '$2,450' },
-    { name: 'Designer Jeans', sales: 189, revenue: '$3,780' },
-    { name: 'Sports Shoes', sales: 156, revenue: '$2,340' },
-    { name: 'Winter Jacket', sales: 134, revenue: '$4,020' },
-  ];
+  // Top products are now fetched from the API via data.top_products
 
   return (
     <Box sx={{ p: 3 }}>
       {/* Welcome Section */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, mb: 1 }}>
-          Welcome to Zer Zabar Admin
-        </Typography>
-        <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-          Here's what's happening with your store today.
-        </Typography>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, mb: 1 }}>
+            Welcome to Zer Zabar Admin
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+            Here's what's happening with your store today.
+          </Typography>
+        </Box>
+        <Button
+          variant="outlined"
+          startIcon={<Refresh sx={{ 
+            animation: refreshing ? 'spin 1s linear infinite' : 'none',
+            '@keyframes spin': {
+              '0%': { transform: 'rotate(0deg)' },
+              '100%': { transform: 'rotate(360deg)' },
+            },
+          }} />}
+          onClick={handleRefresh}
+          disabled={refreshing}
+          sx={{
+            borderColor: theme.palette.primary.main,
+            color: theme.palette.primary.main,
+            '&:hover': {
+              backgroundColor: theme.palette.primary.main + '20',
+              borderColor: theme.palette.primary.main,
+            },
+            '&:disabled': {
+              borderColor: theme.palette.action.disabled,
+              color: theme.palette.action.disabled,
+            },
+          }}
+        >
+          Refresh
+        </Button>
       </Box>
 
-      {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statsData.map((stat, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card
-              sx={{
-                height: '100%',
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)',
-                border: '1px solid #E0E0E0',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
-                },
-                transition: 'all 0.3s ease',
-              }}
-            >
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 1 }}>
-                      {stat.title}
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
-                      {stat.value}
-                    </Typography>
-                  </Box>
-                  <Avatar
-                    sx={{
-                      backgroundColor: stat.bgColor,
-                      color: stat.color,
-                      width: 48,
-                      height: 48,
-                    }}
-                  >
-                    {stat.icon}
-                  </Avatar>
-                </Box>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {stat.changeType === 'positive' ? (
-                    <TrendingUp sx={{ color: theme.palette.success.main, fontSize: 20 }} />
-                  ) : (
-                    <TrendingDown sx={{ color: theme.palette.error.main, fontSize: 20 }} />
-                  )}
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: stat.changeType === 'positive' ? theme.palette.success.main : theme.palette.error.main,
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    {stat.change} Last Week
-                  </Typography>
-                </Box>
-              </CardContent>
-              
-              <CardActions sx={{ p: 2, pt: 0 }}>
-                <Button
-                  size="small"
-                  sx={{
-                    color: theme.palette.text.secondary,
-                    textTransform: 'none',
-                    '&:hover': {
-                      color: theme.palette.primary.main,
-                      backgroundColor: `${theme.palette.primary.main}20`,
-                    },
-                  }}
-                >
-                  View More
-                </Button>
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      {/* Stats Cards removed per requirements */}
 
       {/* Analytics Section */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* Sales Summary */}
-        <Grid item xs={12} lg={8}>
-          <Card sx={{ height: '400px' }}>
-            <CardContent sx={{ p: 3 }}>
+      <Grid container spacing={3} sx={{ mb: 4,    display: 'flex', flexWrap: 'nowrap',   }} >
+        {/* Monthly Revenue Stats */}
+        <Grid item xs={12} md={6} lg={6} sm={6}   >
+          <Card>
+            <CardContent sx={{ p: 3  }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
-                Sales Summary (Last 7 Days)
+                Monthly Revenue Overview
               </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '300px', overflowY: 'auto' }}>
-                {salesSummary && salesSummary.length > 0 ? (
-                  salesSummary.map((item, index) => (
-                    <Box key={index} sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center',
-                      p: 2,
-                      backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
-                      borderRadius: 1,
-                      '&:hover': { backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD' }
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{item.day}</Typography>
-                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>{item.date}</Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', gap: 3 }}>
-                        <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontWeight: 'bold' }}>
-                          PKR {item.revenue.toLocaleString()}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
-                          {item.orders} orders
-                        </Typography>
-                      </Box>
+              <Grid container spacing={2} sx={{p:0}}>
+                <Grid item xs={12} sm={4}>
+                  <Box sx={{ 
+                 p:2,
+                    backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.primary.main}40`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                     flexWrap: 'nowrap',
+                  }}>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
+                        PKR {(data.this_month?.revenue || 0).toLocaleString()}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                        This Month Revenue
+                      </Typography>
                     </Box>
-                  ))
-                ) : (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <EmptyState
-                      icon={<Assessment />}
-                      title="No Sales Data"
-                      description="No sales data available for the last 7 days."
-                      size="small"
-                    />
+                   
                   </Box>
-                )}
-              </Box>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Box sx={{ 
+               p:2,
+                    backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.success.main}40`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 'bold', color: theme.palette.success.main }}>
+                        {data.this_month?.orders || 0}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                        This Month Orders
+                      </Typography>
+                    </Box>
+                  
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Box sx={{ 
+               p:2,
+                    backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.warning.main}40`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 'bold', color: theme.palette.warning.main }}>
+                        {data.today?.orders || 0}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                        Today's Orders
+                      </Typography>
+                    </Box>
+                  
+                  </Box>
+                </Grid>
+              </Grid>
             </CardContent>
           </Card>
         </Grid>
 
         {/* Top Products */}
-        <Grid item xs={12} lg={4}>
-          <Card sx={{ height: '400px' }}>
+        <Grid item xs={12} md={6} lg={6}>
+          <Card>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
-                Top Selling Products
+                Top 5 Products by Quantity (Last 7 Days)
               </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '300px', overflowY: 'auto' }}>
-                {data.top_products && data.top_products.length > 0 ? (
-                  data.top_products.map((product, index) => (
-                  <Box key={index} sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    p: 2,
-                    backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
-                    borderRadius: 1,
-                    '&:hover': { backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD' }
-                  }}>
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{product.product_name}</Typography>
-                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                        {product.total_sold} sold
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
-                      PKR {product.total_revenue?.toLocaleString() || '0'}
-                    </Typography>
-                  </Box>
-                  ))
-                ) : (
-                  <EmptyState
-                    icon={<Assessment />}
-                    title="No Products Yet"
-                    description="No product sales data available. Start adding products to see analytics."
-                    size="small"
-                  />
-                )}
-              </Box>
+              {data.top_products_by_quantity && data.top_products_by_quantity.length > 0 ? (
+                <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
+                  <Table size="small">
+                    <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F1F3F5' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>#</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Product</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }} align="right">Sold</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }} align="right">Variants</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>SKU</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(data.top_products_by_quantity || []).slice(0, 5).map((product, index) => (
+                        <TableRow key={index} hover>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {product.product_name}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip label={`${product.total_sold}`} color="success" size="small" />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip label={`${product.variant_count}`} color="primary" size="small" variant="outlined" />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                              {product.product_sku}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <EmptyState
+                  icon={<Assessment />}
+                  title="No Products Yet"
+                  description="No product sales data available for the last 7 days."
+                  size="small"
+                />
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -439,21 +438,7 @@ const Dashboard = () => {
             <Typography variant="h6" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
               Recent Orders
             </Typography>
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              sx={{
-                backgroundColor: '#FFD700',
-                color: '#2C2C2C',
-                '&:hover': {
-                  backgroundColor: '#F57F17',
-                },
-                px: 3,
-                py: 1,
-              }}
-            >
-              Create Order
-            </Button>
+           
           </Box>
           
           <TableContainer>
@@ -472,8 +457,27 @@ const Dashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.recent_orders && data.recent_orders.length > 0 ? (
-                  data.recent_orders.map((order) => (
+                {(() => {
+                  const all = Array.isArray(data.recent_orders) ? data.recent_orders : [];
+                  const now = new Date();
+                  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+                  const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+
+                  const isToday = (d) => {
+                    const dt = new Date(d);
+                    return dt >= startOfToday && dt <= endOfToday;
+                  };
+                  const isInLast7Days = (d) => {
+                    const dt = new Date(d);
+                    return dt >= sevenDaysAgo && dt <= endOfToday;
+                  };
+
+                  const todays = all.filter(o => isToday(o.created_at));
+                  const toShow = todays.length > 0 ? todays : all.filter(o => isInLast7Days(o.created_at));
+
+                  return toShow && toShow.length > 0 ? (
+                    toShow.map((order) => (
                   <TableRow
                     key={order.id}
                     sx={{
@@ -555,8 +559,8 @@ const Dashboard = () => {
                       />
                     </TableCell>
                   </TableRow>
-                  ))
-                ) : (
+                    ))
+                  ) : (
                   <TableRow>
                     <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
                       <EmptyState
@@ -567,281 +571,14 @@ const Dashboard = () => {
                       />
                     </TableCell>
                   </TableRow>
-                )}
+                  )
+                })()}
               </TableBody>
             </Table>
           </TableContainer>
         </CardContent>
       </Card>
 
-      {/* Content Grid */}
-      <Grid container spacing={3}>
-        {/* Recent Activities */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
-                Recent Activities
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {recentActivities.map((activity) => (
-                  <Box
-                    key={activity.id}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                      p: 2,
-                      borderRadius: '8px',
-                      backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
-                      '&:hover': {
-                        backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD',
-                        transform: 'translateX(4px)',
-                      },
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
-                    <Avatar
-                      sx={{
-                        backgroundColor: 
-                          activity.status === 'success' ? '#4CAF50' :
-                          activity.status === 'warning' ? '#FF9800' :
-                          activity.status === 'info' ? '#2196F3' : '#757575',
-                        width: 32,
-                        height: 32,
-                      }}
-                    >
-                      {activity.type === 'order' && <ShoppingCart />}
-                      {activity.type === 'inventory' && <Inventory />}
-                      {activity.type === 'customer' && <People />}
-                      {activity.type === 'payment' && <AttachMoney />}
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
-                        {activity.message}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                        {activity.time}
-                      </Typography>
-                    </Box>
-                    <Chip
-                      label={activity.status}
-                      size="small"
-                      sx={{
-                        backgroundColor: 
-                          activity.status === 'success' ? `${theme.palette.success.main}20` :
-                          activity.status === 'warning' ? `${theme.palette.warning.main}20` :
-                          activity.status === 'info' ? `${theme.palette.primary.main}20` : `${theme.palette.text.secondary}20`,
-                        color: 
-                          activity.status === 'success' ? theme.palette.success.main :
-                          activity.status === 'warning' ? theme.palette.warning.main :
-                          activity.status === 'info' ? theme.palette.primary.main : theme.palette.text.secondary,
-                        textTransform: 'capitalize',
-                      }}
-                    />
-                  </Box>
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Recent Products */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
-                Recent Products
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {(dashboardData?.products?.recent_products || []).map((product, index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      p: 2,
-                      borderRadius: '8px',
-                      backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
-                      '&:hover': {
-                        backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD',
-                        transform: 'translateX(4px)',
-                      },
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
-                        {product.name}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                        {product.category?.name || 'No Category'} • Stock: {product.stock_quantity || 0}
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.success.main }}>
-                      ₨{product.sale_price || product.price}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Inventory Summary */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
-                Inventory Summary
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Total Quantity</Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
-                    {dashboardData?.inventory?.total_quantity || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Available</Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontWeight: 'bold' }}>
-                    {dashboardData?.inventory?.available_quantity || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Reserved</Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.warning.main, fontWeight: 'bold' }}>
-                    {dashboardData?.inventory?.reserved_quantity || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Low Stock Items</Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.warning.main, fontWeight: 'bold' }}>
-                    {dashboardData?.inventory?.low_stock || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Out of Stock</Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.error.main, fontWeight: 'bold' }}>
-                    {dashboardData?.inventory?.out_of_stock || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Total Products</Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.secondary.main, fontWeight: 'bold' }}>
-                    {dashboardData?.inventory?.total_products || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Products with Variants</Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.info.main, fontWeight: 'bold' }}>
-                    {dashboardData?.inventory?.products_with_variants || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA', borderRadius: '8px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Total Variants</Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
-                    {dashboardData?.inventory?.total_variants || 0}
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Recent Inventory Movements */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: theme.palette.text.primary }}>
-                Recent Inventory Movements
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {(dashboardData?.recent_inventory_movements || []).map((movement, index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                      p: 2,
-                      borderRadius: '8px',
-                      backgroundColor: theme.palette.mode === 'dark' ? '#2C2C2C' : '#F8F9FA',
-                      '&:hover': {
-                        backgroundColor: theme.palette.mode === 'dark' ? '#3C3C3C' : '#E3F2FD',
-                        transform: 'translateX(4px)',
-                      },
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
-                    <Avatar
-                      sx={{
-                        backgroundColor: movement.quantity_change > 0 ? theme.palette.success.main : theme.palette.error.main,
-                        width: 32,
-                        height: 32,
-                      }}
-                    >
-                      {movement.quantity_change > 0 ? <TrendingUp /> : <TrendingDown />}
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
-                        {movement.inventory?.productVariant?.product?.name || 'Unknown Product'}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                        {movement.type_label} • {movement.quantity_change > 0 ? '+' : ''}{movement.quantity_change} units
-                      </Typography>
-                    </Box>
-                    <Chip
-                      label={movement.type_label}
-                      size="small"
-                      sx={{
-                        backgroundColor: movement.quantity_change > 0 ? `${theme.palette.success.main}20` : `${theme.palette.error.main}20`,
-                        color: movement.quantity_change > 0 ? theme.palette.success.main : theme.palette.error.main,
-                        textTransform: 'capitalize',
-                      }}
-                    />
-                  </Box>
-                ))}
-                {(!dashboardData?.recent_inventory_movements || dashboardData.recent_inventory_movements.length === 0) && (
-                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary, textAlign: 'center', py: 2 }}>
-                    No recent inventory movements
-                  </Typography>
-                )}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Size & Color Distribution */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: '#212121' }}>
-                Size & Color Distribution
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>Top Sizes</Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {Object.entries(dashboardData?.variants?.size_distribution || {}).slice(0, 5).map(([size, count]) => (
-                      <Chip key={size} label={`${size}: ${count}`} size="small" color="primary" />
-                    ))}
-                  </Box>
-                </Box>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>Top Colors</Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {Object.entries(dashboardData?.variants?.color_distribution || {}).slice(0, 5).map(([color, count]) => (
-                      <Chip key={color} label={`${color}: ${count}`} size="small" color="secondary" />
-                    ))}
-                  </Box>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
     </Box>
   );
 };

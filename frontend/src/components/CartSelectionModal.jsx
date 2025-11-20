@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -22,7 +22,7 @@ import {
   Remove,
   ShoppingCart,
 } from "@mui/icons-material";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import { getProductImageUrl } from "../utils/imageUtils";
 
 const CartSelectionModal = ({ open, onClose, product }) => {
@@ -32,35 +32,176 @@ const CartSelectionModal = ({ open, onClose, product }) => {
   const [quantity, setQuantity] = useState(1);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+
+  // Reset selections when product changes
+  useEffect(() => {
+    if (product) {
+      setSelectedSize("");
+      setSelectedColor("");
+      setQuantity(1);
+    }
+  }, [product]);
+
+  // Get available sizes from variants
+  const getAvailableSizes = () => {
+    if (!product || !product.variants?.length) return [];
+    return [...new Set(product.variants.map(variant => variant.size).filter(Boolean))];
+  };
+
+  // Get available colors from variants
+  const getAvailableColors = () => {
+    if (!product || !product.variants?.length) return [];
+    
+    // If a size is selected, only show colors available for that size
+    if (selectedSize) {
+      const colorsForSize = product.variants
+        .filter(variant => variant.size === selectedSize)
+        .map(variant => variant.color)
+        .filter(Boolean);
+      return [...new Set(colorsForSize)];
+    }
+    
+    // If no size selected, show all available colors
+    return [...new Set(product.variants.map(variant => variant.color).filter(Boolean))];
+  };
+
+  // Get current stock from the selected variant
+  const getCurrentStock = () => {
+    if (!product || !product.variants?.length) return 0;
+    
+    // Find the specific variant based on selected size and color
+    const selectedVariant = product.variants.find(variant => 
+      variant.size === selectedSize && variant.color === selectedColor
+    );
+    
+    if (!selectedVariant) return 0;
+    
+    // Return the variant's quantity directly
+    return selectedVariant.quantity || 0;
+  };
 
   const handleQuantityChange = (newQuantity) => {
     if (newQuantity < 1) {
       setQuantity(1);
     } else {
+      // Get stock from selected variant
+      const currentStock = getCurrentStock();
+      
+      if (currentStock === 0) {
+        setSnackbarMessage("This variant is out of stock");
+        setSnackbarSeverity("error");
+        setSnackbarOpen(true);
+        return;
+      }
+      if (newQuantity > currentStock) {
+        setSnackbarMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+        setSnackbarSeverity("error");
+        setSnackbarOpen(true);
+        return;
+      }
       setQuantity(newQuantity);
+    }
+  };
+
+  const handleSizeChange = (size) => {
+    setSelectedSize(size);
+    
+    // If color is selected, check if it's available for the new size
+    if (selectedColor) {
+      const availableColorsForNewSize = product?.variants
+        ?.filter(variant => variant.size === size)
+        ?.map(variant => variant.color)
+        ?.filter(Boolean) || [];
+      
+      // If current color is not available for new size, clear it
+      if (!availableColorsForNewSize.includes(selectedColor)) {
+        setSelectedColor("");
+      }
     }
   };
 
   const handleAddToCart = () => {
     if (!product) return;
 
+    // Validate that both size and color are selected
+    const availableSizes = getAvailableSizes();
+    const availableColors = getAvailableColors();
+    
+    // Check if size selection is required and not selected
+    if (availableSizes.length > 0 && !selectedSize) {
+      setSnackbarMessage("Please select a size");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+    
+    // Check if color selection is required and not selected
+    if (availableColors.length > 0 && !selectedColor) {
+      setSnackbarMessage("Please select a color");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+    
+    // Check if both are required but not selected
+    if ((availableSizes.length > 0 && !selectedSize) || (availableColors.length > 0 && !selectedColor)) {
+      setSnackbarMessage("Please select size and color");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+
+    // Check stock availability before adding to cart
+    const currentStock = getCurrentStock();
+    if (currentStock === 0) {
+      setSnackbarMessage("This variant is out of stock");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+    if (quantity > currentStock) {
+      setSnackbarMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+
+    // Find the selected variant to get the correct price
+    const selectedVariant = product.variants?.find(variant => 
+      variant.size === selectedSize && 
+      variant.color === selectedColor
+    );
+    
+    if (!selectedVariant) {
+      setSnackbarMessage("Selected variant not found. Please select a valid size and color combination.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+    
+    const variantPrice = selectedVariant?.sale_price || selectedVariant?.price || 0;
+    const variantOriginalPrice = selectedVariant?.sale_price ? selectedVariant?.price : null;
+    
     const cartItem = {
       id: product.id,
       name: product.name,
-      price: parseFloat(product.sale_price || product.price || 0),
-      originalPrice: product.sale_price ? parseFloat(product.price || 0) : null,
+      product_id: product.product_id, // Admin-entered Product ID
+      price: parseFloat(variantPrice),
+      originalPrice: variantOriginalPrice ? parseFloat(variantOriginalPrice) : null,
       image: product.images?.[0]?.image_path,
-      size: selectedSize || product.sizes?.[0] || 'M',
-      color: selectedColor || product.colors?.[0] || '',
+      size: selectedSize,
+      color: selectedColor,
       quantity: quantity,
       // Include product variants for cart editing
-      sizes: product.sizes || [],
-      colors: product.colors || [],
+      sizes: getAvailableSizes(),
+      colors: getAvailableColors(),
       variants: product.variants || []
     };
     
     addToCart(cartItem);
     setSnackbarMessage(`${product.name} added to cart!`);
+    setSnackbarSeverity("success");
     setSnackbarOpen(true);
     
     onClose();
@@ -92,7 +233,10 @@ const CartSelectionModal = ({ open, onClose, product }) => {
             maxWidth: { xs: '70vw', sm: '70vw', md: 450 },
             minWidth: { xs: '70vw', sm: '70vw', md: 450 },
             position: 'relative',
-            mx: 'auto'
+            mx: 'auto',
+            overflow: 'hidden', // Prevent scrollbar on paper
+            display: 'flex',
+            flexDirection: 'column'
           }
         }}
         sx={{
@@ -103,7 +247,15 @@ const CartSelectionModal = ({ open, onClose, product }) => {
             maxWidth: { xs: '90vw', sm: '70vw', md: 450 },
             minWidth: { xs: '90vw', sm: '70vw', md: 450 },
             position: 'relative',
-            mx: 'auto'
+            mx: 'auto',
+            overflow: 'hidden', // Prevent scrollbar
+            display: 'flex',
+            flexDirection: 'column'
+          },
+          '& .MuiDialogContent-root': {
+            overflow: 'hidden !important', // Force no scrollbar
+            overflowY: 'hidden !important',
+            overflowX: 'hidden !important'
           },
           '& .MuiDialog-container': {
             display: 'flex',
@@ -144,8 +296,10 @@ const CartSelectionModal = ({ open, onClose, product }) => {
         
         <DialogContent sx={{ 
           p: { xs: 2, sm: 3 },
+          overflow: 'hidden', // Prevent scrollbar
           '&.MuiDialogContent-root': {
-            paddingTop: { xs: 2, sm: 3 }
+            paddingTop: { xs: 2, sm: 3 },
+            overflow: 'hidden' // Prevent scrollbar
           }
         }}>
           <Box sx={{ 
@@ -188,11 +342,18 @@ const CartSelectionModal = ({ open, onClose, product }) => {
                 {product.name}
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 500, mb: 3, color: "#000", fontSize: { xs: "1rem", sm: "1.25rem" } }}>
-                ₨{product.sale_price || product.price}
+                ₨{(() => {
+                  // Find the selected variant to get the correct price
+                  const selectedVariant = product.variants?.find(variant => 
+                    variant.size === (selectedSize || getAvailableSizes()[0]) && 
+                    variant.color === (selectedColor || getAvailableColors()[0])
+                  );
+                  return selectedVariant?.sale_price || selectedVariant?.price || product.sale_price || product.price || 0;
+                })()}
               </Typography>
               
               {/* Size Selection */}
-              {product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0 && (
+              {getAvailableSizes().length > 0 && (
                 <FormControl fullWidth sx={{ mb: { xs: 2, sm: 2 } }}>
                   <InputLabel sx={{ 
                     fontSize: { xs: "0.9rem", sm: "1rem" },
@@ -203,7 +364,7 @@ const CartSelectionModal = ({ open, onClose, product }) => {
                   }}>Size</InputLabel>
                   <Select
                     value={selectedSize}
-                    onChange={(e) => setSelectedSize(e.target.value)}
+                    onChange={(e) => handleSizeChange(e.target.value)}
                     label="Size"
                     sx={{ 
                       fontSize: { xs: "0.9rem", sm: "1rem" },
@@ -223,7 +384,7 @@ const CartSelectionModal = ({ open, onClose, product }) => {
                       }
                     }}
                   >
-                    {product.sizes.map((size) => (
+                    {getAvailableSizes().map((size) => (
                       <MenuItem key={size} value={size} sx={{ 
                         fontSize: { xs: "0.9rem", sm: "1rem" },
                         minHeight: { xs: "48px", sm: "40px" },
@@ -237,50 +398,73 @@ const CartSelectionModal = ({ open, onClose, product }) => {
               )}
               
               {/* Color Selection */}
-              {product.colors && Array.isArray(product.colors) && product.colors.length > 0 && (
-                <FormControl fullWidth sx={{ mb: { xs: 2, sm: 2 } }} variant:standard>
-                  <InputLabel sx={{ 
-                    fontSize: { xs: "0.9rem", sm: "1rem" },
-                    transform: selectedColor ? 'translate(14px, -9px) scale(0.75)' : 'translate(14px, 20px) scale(1)',
-                    '&.Mui-focused': {
-                      transform: 'translate(14px, -9px) scale(0.75)'
-                    }
-                  }}>Color</InputLabel>
-                  <Select
-                    value={selectedColor}
-                    onChange={(e) => setSelectedColor(e.target.value)}
-                    label="Color"
-                    sx={{ 
-                      fontSize: { xs: "0.9rem", sm: "1rem" },
-                      "& .MuiSelect-select": {
-                        padding: { xs: "16px 14px", sm: "16px 14px" },
-                        minHeight: { xs: "48px", sm: "40px" },
-                        width: "100%"
-                      },
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#e0e0e0"
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#000"
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#000"
-                      }
-                    }}
-                  >
-                    {product.colors.map((color) => (
-                      <MenuItem key={color} value={color} sx={{ 
-                        fontSize: { xs: "0.9rem", sm: "1rem" },
-                        minHeight: { xs: "48px", sm: "40px" },
-                        width: "100%"
-                      }}>
+              {getAvailableColors().length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: { xs: "0.9rem", sm: "0.875rem" } }}>Color</Typography>
+                  <Stack direction="row" spacing={{ xs: 1, sm: 1, md: 2 }} flexWrap="wrap" rowGap={{ xs: 0.5, md: 1.5 }}>
+                    {getAvailableColors().map((color, idx) => (
+                      <Button
+                        key={idx} 
+                        variant={selectedColor === color ? "contained" : "outlined"}
+                        onClick={() => setSelectedColor(color)}
+                        sx={{
+                          width: 65,
+                          minWidth: { xs: 35, sm: 45, md: 65 },
+                          height: { xs: 28, sm: 28, md: 28 },
+                          borderRadius: "18px",
+                          fontSize: { xs: "0.55rem", sm: "0.7rem" },
+                          backgroundColor: selectedColor === color ? "#000" : "transparent",
+                          color: selectedColor === color ? "#fff" : "#000",
+                          borderColor: "#000",
+                          marginBottom: { xs: 0.5, sm: 0 },
+                          "&:hover": {
+                            backgroundColor: selectedColor === color ? "#333" : "rgba(0,0,0,0.04)"
+                          }
+                        }}
+                      >
                         {color}
-                      </MenuItem>
+                      </Button>
                     ))}
-                  </Select>
-                </FormControl>
+                  </Stack>
+                </Box>
               )}
               
+              {/* Validation message */}
+              {(() => {
+                const availableSizes = getAvailableSizes();
+                const availableColors = getAvailableColors();
+                const needsSize = availableSizes.length > 0 && !selectedSize;
+                const needsColor = availableColors.length > 0 && !selectedColor;
+                
+                if (needsSize || needsColor) {
+                  return (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2" sx={{ 
+                        color: 'error.main',
+                        fontSize: { xs: "0.85rem", sm: "0.875rem" },
+                        fontWeight: 500
+                      }}>
+                        Please select {needsSize && needsColor ? 'size and color' : needsSize ? 'a size' : 'a color'}
+                      </Typography>
+                    </Box>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Stock indicator */}
+              {selectedSize && selectedColor && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ 
+                    color: getCurrentStock() > 0 ? 'success.main' : 'error.main',
+                    fontSize: { xs: "0.85rem", sm: "0.875rem" },
+                    fontWeight: 500
+                  }}>
+                    {getCurrentStock() > 0 ? `${getCurrentStock()} items available` : 'Out of stock'}
+                  </Typography>
+                </Box>
+              )}
+
               {/* Quantity Selection */}
               <Box sx={{ mb: { xs: 2, sm: 2 } }}>
                 <Typography variant="body2" sx={{ 
@@ -377,6 +561,17 @@ const CartSelectionModal = ({ open, onClose, product }) => {
           <Button 
             variant="contained" 
             onClick={handleAddToCart}
+            disabled={(() => {
+              const availableSizes = getAvailableSizes();
+              const availableColors = getAvailableColors();
+              const needsSize = availableSizes.length > 0 && !selectedSize;
+              const needsColor = availableColors.length > 0 && !selectedColor;
+              const currentStock = getCurrentStock();
+              const isOutOfStock = selectedSize && selectedColor && currentStock === 0;
+              
+              // Disable if size/color not selected OR if out of stock
+              return needsSize || needsColor || isOutOfStock;
+            })()}
             fullWidth
             sx={{ 
               backgroundColor: "#000", 
@@ -424,7 +619,7 @@ const CartSelectionModal = ({ open, onClose, product }) => {
       >
         <Alert 
           onClose={() => setSnackbarOpen(false)} 
-          severity="success"
+          severity={snackbarSeverity}
           sx={{ width: "100%" }}
         >
           {snackbarMessage}
@@ -435,3 +630,5 @@ const CartSelectionModal = ({ open, onClose, product }) => {
 };
 
 export default CartSelectionModal;
+
+            

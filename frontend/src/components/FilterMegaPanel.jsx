@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Box, Typography, Drawer, IconButton, Divider, Chip, Button } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
 
 const sectionTitleSx = {
 	fontSize: '0.9rem',
@@ -38,6 +39,8 @@ export default function FilterMegaPanel({
 	onClearAll,
 	onApply
 }) {
+	const [showCollections, setShowCollections] = useState(false);
+
 	return (
 		<Drawer 
 			anchor="right" 
@@ -49,10 +52,9 @@ export default function FilterMegaPanel({
 					width: { xs: '75vw', sm: '60vw', md: 520 },
 					maxWidth: { xs: '75vw', sm: '60vw', md: 520 },
 					minWidth: { xs: '300px', sm: '400px', md: 520 },
-					height: '100vh',
-					borderLeft: '1px solid #e5e5e5',
 					top: { xs: '64px', sm: '64px', md: 0 }, // Position below navbar
 					height: { xs: 'calc(100vh - 64px)', sm: 'calc(100vh - 64px)', md: '100vh' }, // Account for navbar height
+					borderLeft: '1px solid #e5e5e5',
 				}
 			}}
 		>
@@ -108,10 +110,28 @@ export default function FilterMegaPanel({
 					{/* Color */}
 					<Box sx={{ mt: 1 }}>
 						<Typography sx={sectionTitleSx}>Color</Typography>
-						<Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1 }}>
+						<Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
 							{colors.map((c) => (
-								<Box key={c.value} onClick={() => onToggleColor(c.value)} sx={{ ...optionBoxSx, display: 'flex', alignItems: 'center', gap: 1, borderColor: selectedColors.includes(c.value)?'#000':'#e5e5e5' }}>
-									<Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: c.hex || '#000' }} />
+								<Box 
+									key={c.value} 
+									onClick={() => onToggleColor(c.value)} 
+									sx={{ 
+										...optionBoxSx, 
+										display: 'flex', 
+										alignItems: 'center', 
+										gap: 1, 
+										borderColor: selectedColors.includes(c.value)?'#000':'#e5e5e5',
+										minWidth: 'auto',
+										flex: '0 0 auto'
+									}}
+								>
+									<Box sx={{ 
+										width: 12, 
+										height: 12, 
+										borderRadius: '50%', 
+										backgroundColor: c.hex || c.value || '#000',
+										border: '1px solid #ddd'
+									}} />
 									{c.label}
 								</Box>
 							))}
@@ -128,15 +148,42 @@ export default function FilterMegaPanel({
 						</Box>
 					</Box>
 
-					{/* Collection (optional) */}
+					{/* Collections (optional, with expandable plus) */}
 					{collections?.length ? (
 						<Box sx={{ mt: 2 }}>
-							<Typography sx={sectionTitleSx}>Collection</Typography>
-							<Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1 }}>
-								{collections.map((col) => (
-									<Box key={col} onClick={() => onToggleCollection(col)} sx={{ ...optionBoxSx, borderColor: selectedCollections.includes(col)?'#000':'#e5e5e5' }}>{col}</Box>
-								))}
+							<Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+								<Typography sx={sectionTitleSx}>Collections</Typography>
+								<IconButton 
+									size="small" 
+									onClick={() => setShowCollections(v => !v)}
+									sx={{
+										backgroundColor: '#FFD700',
+										color: '#2C2C2C',
+										'&:hover': { backgroundColor: '#FFC107' },
+										borderRadius: 1,
+										width: 28,
+										height: 28
+									}}
+								>
+									<AddIcon sx={{ fontSize: 18 }} />
+								</IconButton>
 							</Box>
+							{showCollections && (
+								<Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1, mt: 1 }}>
+									{collections.map((col) => (
+										<Box 
+											key={col} 
+											onClick={() => onToggleCollection(col)} 
+											sx={{ 
+												...optionBoxSx, 
+												borderColor: selectedCollections.includes(col)?'#000':'#e5e5e5' 
+											}}
+										>
+{col}
+										</Box>
+									))}
+								</Box>
+							)}
 						</Box>
 					) : null}
 				</Box>

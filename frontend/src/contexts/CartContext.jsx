@@ -39,7 +39,7 @@ const cartReducer = (state, action) => {
         ...state,
         items: state.items.map(item =>
           item.cartId === action.payload.cartId
-            ? { ...item, quantity: action.payload.quantity }
+            ? { ...item, quantity: action.payload.quantity, ...action.payload }
             : item
         ),
       };
@@ -126,13 +126,13 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  const updateQuantity = (cartId, quantity) => {
+  const updateQuantity = (cartId, quantity, additionalProps = {}) => {
     if (quantity <= 0) {
       removeFromCart(cartId);
     } else {
       dispatch({
         type: 'UPDATE_QUANTITY',
-        payload: { cartId, quantity },
+        payload: { cartId, quantity, ...additionalProps },
       });
     }
   };

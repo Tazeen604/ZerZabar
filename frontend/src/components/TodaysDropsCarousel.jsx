@@ -16,7 +16,7 @@ import {
   Favorite as FavoriteIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import api from "../services/api";
 import { getProductImageUrl } from "../utils/imageUtils";
 import CartSelectionModal from "./CartSelectionModal";
@@ -64,13 +64,13 @@ const TodaysDropsCarousel = () => {
     
     switch (selectedPriceFilter) {
       case "under1000":
-        filtered = (products || []).filter(p => (p?.sale_price || p?.price) < 1000);
+        filtered = (products || []).filter(p => (p?.variants?.[0]?.sale_price || p?.variants?.[0]?.price || p?.sale_price || p?.price || 0) < 1000);
         break;
       case "under2000":
-        filtered = (products || []).filter(p => (p?.sale_price || p?.price) < 2000);
+        filtered = (products || []).filter(p => (p?.variants?.[0]?.sale_price || p?.variants?.[0]?.price || p?.sale_price || p?.price || 0) < 2000);
         break;
       case "under3000":
-        filtered = (products || []).filter(p => (p?.sale_price || p?.price) < 3000);
+        filtered = (products || []).filter(p => (p?.variants?.[0]?.sale_price || p?.variants?.[0]?.price || p?.sale_price || p?.price || 0) < 3000);
         break;
       default:
         filtered = products || [];
@@ -105,11 +105,16 @@ const TodaysDropsCarousel = () => {
     const cartItem = {
       id: product.id,
       name: product?.name || 'Unnamed Product',
-      price: product?.sale_price || product?.price || 0,
+      product_id: product.product_id, // Admin-entered Product ID
+      price: product?.variants?.[0]?.sale_price || product?.variants?.[0]?.price || product?.sale_price || product?.price || 0,
       image: product?.images?.[0]?.image_path || "",
       size: product?.sizes?.[0] || "One Size",
       color: product?.colors?.[0] || "Default",
       quantity: 1,
+      // Include product variants for cart editing
+      sizes: product?.sizes || [],
+      colors: product?.colors || [],
+      variants: product?.variants || []
     };
     addToCart(cartItem);
   };
@@ -168,9 +173,9 @@ const TodaysDropsCarousel = () => {
       sx={{
         backgroundColor: "#f8f9fa",
         py: { xs: 4, sm: 5, md: 6 },
-        px: { xs: 2, sm: 3, md: 3, lg: 4 },
+        px: { xs: 0.5, sm: 1, md: 1.5, lg: 2, xl: 3 },
         borderRadius: "20px",
-        mx: { xs: 2, sm: 3, md: 3, lg: 4 },
+        mx: { xs: 0.5, sm: 1, md: 1.5, lg: 2, xl: 3 },
         my: { xs: 3, sm: 4, md: 4 },
       }}
     >
@@ -181,7 +186,7 @@ const TodaysDropsCarousel = () => {
           justifyContent: "space-between",
           alignItems: "flex-start",
           mb: { xs: 3, sm: 3, md: 4 },
-          px: { xs: 1, sm: 2, md: 2, lg: 3 },
+          px: { xs: 0.25, sm: 0.5, md: 0.75, lg: 1, xl: 1.5 },
           flexDirection: { xs: "column", sm: "row" },
           gap: { xs: 2, sm: 0 },
         }}
@@ -210,7 +215,7 @@ const TodaysDropsCarousel = () => {
             variant="body2"
             sx={{
               color: "#666",
-              fontSize: { xs: "0.8rem", sm: "0.9rem" },
+              fontSize: { xs: "0.6rem", sm: "0.7rem" },
               fontWeight: 500,
             }}
           >
@@ -225,7 +230,7 @@ const TodaysDropsCarousel = () => {
           display: "flex",
           gap: { xs: 0.5, sm: 1.5 },
           mb: { xs: 3, sm: 3, md: 4 },
-          px: { xs: 1, sm: 2, md: 2, lg: 3 },
+          px: { xs: 0.25, sm: 0.5, md: 0.75, lg: 1, xl: 1.5 },
           flexWrap: "nowrap",
           overflowX: { xs: "auto", sm: "visible" },
           justifyContent: { xs: "flex-start", sm: "flex-start" },
@@ -251,7 +256,7 @@ const TodaysDropsCarousel = () => {
               borderRadius: "4px",
               px: { xs: 1, sm: 2 },
               py: 0.5,
-              fontSize: { xs: "0.65rem", sm: "0.8rem" },
+              fontSize: { xs: "0.45rem", sm: "0.6rem" },
               fontWeight: 400,
               textTransform: "none",
               minWidth: { xs: "fit-content", sm: "auto" },
@@ -274,13 +279,13 @@ const TodaysDropsCarousel = () => {
           display: "grid",
           gridTemplateColumns: {
             xs: "repeat(2, 1fr)",
-            sm: "repeat(3, 1fr)",
-            md: "repeat(4, 1fr)",
+            sm: "repeat(2, 1fr)",
+            md: "repeat(3, 1fr)",
             lg: "repeat(4, 1fr)",
             xl: "repeat(4, 1fr)",
           },
-          gap: { xs: 1.5, sm: 2, md: 2.5, lg: 3 },
-          px: { xs: 1, sm: 2, md: 2, lg: 3 },
+          gap: { xs: 0.5, sm: 0.75, md: 1, lg: 1.5, xl: 2 },
+          px: { xs: 0.25, sm: 0.5, md: 0.75, lg: 1, xl: 1.5 },
           py: { xs: 1, sm: 2 },
         }}
       >
@@ -421,23 +426,23 @@ const TodaysDropsCarousel = () => {
                 </Box>
               </Box>
 
-               {/* Product Details */}
+              {/* Product Details */}
                <CardContent sx={{ 
-                 p: { xs: 1.5, sm: 2 },
+                 p: { xs: 1, sm: 2 },
                  height: "auto",
-                 minHeight: { xs: "140px", sm: "auto" },
+                 minHeight: { xs: "auto", sm: "auto" },
                  display: "flex",
                  flexDirection: "column",
                  justifyContent: "flex-start"
                }}>
-                 <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                 <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 0.25, sm: 0.5 } }}>
                    {/* Category - Grey color */}
                    {product.category && (
-                     <Typography 
-                       variant="body2" 
-                       sx={{ 
-                         color: "#666",
-                         fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "#666",
+                         fontSize: { xs: "0.5rem", sm: "0.6rem" },
                          textTransform: "uppercase",
                          letterSpacing: "0.5px",
                          fontWeight: 500
@@ -452,39 +457,39 @@ const TodaysDropsCarousel = () => {
                      variant="h6"
                      sx={{
                        fontWeight: 600,
-                       fontSize: { xs: "0.8rem", sm: "1rem" },
-                       lineHeight: 1.3,
+                       fontSize: { xs: "0.6rem", sm: "0.8rem" },
+                    lineHeight: 1.3,
                        overflow: "hidden",
                        textOverflow: "ellipsis",
                        display: "-webkit-box",
                        WebkitLineClamp: { xs: 2, sm: 2 },
                        WebkitBoxOrient: "vertical",
                        color: "#000",
-                       mb: 0.5,
+                       mb: { xs: 0.25, sm: 0.5 },
                        wordWrap: "break-word",
                        whiteSpace: "normal"
-                     }}
-                   >
-                     {product?.name || 'Unnamed Product'}
-                   </Typography>
-                   
+                  }}
+                >
+                  {product?.name || 'Unnamed Product'}
+                </Typography>
+                
                    {/* Product Price - Black color */}
-                   <Typography
-                     variant="h6"
-                     sx={{
+                  <Typography
+                    variant="h6"
+                    sx={{
                        fontWeight: 600,
-                       color: "#000",
-                       fontSize: { xs: "0.9rem", sm: "1.1rem" },
-                       mb: 0.5
-                     }}
-                   >
-                     ₨{product?.sale_price || product?.price || 0}
-                   </Typography>
-                   
+                      color: "#000",
+                       fontSize: { xs: "0.7rem", sm: "0.9rem" },
+                       mb: { xs: 0.25, sm: 0.5 }
+                    }}
+                  >
+                    ₨{product?.variants?.[0]?.sale_price || product?.variants?.[0]?.price || 'Price not available'}
+                  </Typography>
+                  
                    {/* Stock Status - Red/Green color */}
-                   <Typography 
-                     variant="body2" 
-                     sx={{ 
+                    <Typography
+                      variant="body2"
+                      sx={{
                        color: (() => {
                          // Calculate total stock from variants if available, otherwise use legacy fields
                          let totalStock = 0;
@@ -492,7 +497,7 @@ const TodaysDropsCarousel = () => {
                          if (product.variants && product.variants.length > 0) {
                            // Use variant inventory
                            totalStock = product.variants.reduce((sum, variant) => {
-                             return sum + (variant.inventory?.quantity || 0);
+                             return sum + (variant.quantity || 0);
                            }, 0);
                          } else {
                            // Fallback to legacy inventory fields
@@ -501,7 +506,7 @@ const TodaysDropsCarousel = () => {
                          
                          return totalStock > 0 ? "#4CAF50" : "#f44336";
                        })(),
-                       fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                       fontSize: { xs: "0.5rem", sm: "0.6rem" },
                        fontWeight: 600,
                        display: "block"
                      }}
@@ -513,7 +518,7 @@ const TodaysDropsCarousel = () => {
                        if (product.variants && product.variants.length > 0) {
                          // Use variant inventory
                          totalStock = product.variants.reduce((sum, variant) => {
-                           return sum + (variant.inventory?.quantity || 0);
+                           return sum + (variant.quantity || 0);
                          }, 0);
                        } else {
                          // Fallback to legacy inventory fields
@@ -522,9 +527,9 @@ const TodaysDropsCarousel = () => {
                        
                        return totalStock > 0 ? "In Stock" : "Out of Stock";
                      })()}
-                   </Typography>
-                 </Box>
-               </CardContent>
+                    </Typography>
+                </Box>
+              </CardContent>
             </Card>
           );
         })}
@@ -536,7 +541,7 @@ const TodaysDropsCarousel = () => {
           display: "flex",
           justifyContent: "center",
           mt: { xs: 4, sm: 5, md: 6 },
-          px: { xs: 1, sm: 2, md: 2, lg: 3 }
+          px: { xs: 0.5, sm: 1, md: 1.5, lg: 2 }
         }}>
           <Button
             onClick={handleSeeMore}
@@ -588,7 +593,7 @@ const TodaysDropsCarousel = () => {
           display: "flex",
           justifyContent: "center",
           mt: { xs: 4, sm: 5, md: 6 },
-          px: { xs: 1, sm: 2, md: 2, lg: 3 }
+          px: { xs: 0.5, sm: 1, md: 1.5, lg: 2 }
         }}>
           <Box sx={{
             backgroundColor: "#f8f9fa",

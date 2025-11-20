@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -104,11 +104,11 @@ const ProductManagement = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
 
   const [productForm, setProductForm] = useState({
     name: '',
     description: '',
-    sku: '',
     price: '',
     sale_price: '',
     stock_quantity: '',
@@ -129,6 +129,7 @@ const ProductManagement = () => {
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [selectedColors, setSelectedColors] = useState([]);
   const [sizeCategory, setSizeCategory] = useState('clothing');
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
 
   useEffect(() => {
     fetchProducts();
@@ -160,6 +161,32 @@ const ProductManagement = () => {
       setLoading(false);
     }
   };
+
+  const renderStock = (product) => {
+    // Always calculate stock as the total of all variants' quantities
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+      return product.variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0);
+    }
+    // Fallback to inventory quantity or stock_quantity if no variants
+    const invQty = product.inventory && typeof product.inventory.quantity !== 'undefined'
+      ? Number(product.inventory.quantity) || 0
+      : null;
+    const fallbackQty = typeof product.stock_quantity !== 'undefined' ? Number(product.stock_quantity) || 0 : 0;
+    return invQty !== null ? invQty : fallbackQty;
+  };
+
+  const filteredProducts = useMemo(() => {
+    const normalizedProducts = Array.isArray(products) ? products : [];
+
+    if (stockFilter === 'all') {
+      return normalizedProducts;
+    }
+
+    return normalizedProducts.filter((product) => {
+      const totalStock = renderStock(product);
+      return stockFilter === 'in_stock' ? totalStock > 0 : totalStock <= 0;
+    });
+  }, [products, stockFilter]);
 
   const fetchCategories = async () => {
     try {
@@ -243,7 +270,6 @@ const ProductManagement = () => {
     setProductForm({
       name: '',
       description: '',
-      sku: '',
       price: '',
       sale_price: '',
       stock_quantity: '',
@@ -267,51 +293,9 @@ const ProductManagement = () => {
 
 
   const handleEditProduct = (product) => {
-    console.log('Editing product:', product);
-    console.log('Product category_id:', product.category_id, typeof product.category_id);
-    console.log('Product sizes:', product.sizes, typeof product.sizes);
-    console.log('Product colors:', product.colors, typeof product.colors);
-    console.log('Product images:', product.images, typeof product.images);
-    
-    setEditingProduct(product);
-    setOriginalProductData(product); // Store original data for undo functionality
-    
-    // Ensure category_id is a number
-    const categoryId = product.category_id ? parseInt(product.category_id) : '';
-    const subcategoryId = product.subcategory_id ? parseInt(product.subcategory_id) : '';
-    
-    setProductForm({
-      name: product.name,
-      description: product.description || '',
-      sku: product.sku,
-      price: product.price,
-      sale_price: product.sale_price || '',
-      stock_quantity: product.stock_quantity,
-      category_id: categoryId,
-      subcategory_id: subcategoryId,
-      collection: product.collection || '',
-      attributes: product.attributes || {},
-      sizes: product.sizes || [],
-      colors: product.colors || [],
-      is_active: product.is_active,
-      is_featured: product.is_featured,
-      images: product.images || [],
-    });
-    setImagesToDelete([]); // Reset deleted images
-    setSelectedImages([]); // Reset new images
-    // Ensure sizes and colors are arrays
-    const productSizes = Array.isArray(product.sizes) ? product.sizes : [];
-    const productColors = Array.isArray(product.colors) ? product.colors : [];
-    
-    setSelectedSizes(productSizes); // Set selected sizes
-    setSelectedColors(productColors); // Set selected colors
-    
-    // Fetch subcategories for the selected category
-    if (categoryId) {
-      fetchSubcategories(categoryId);
-    }
-    
-    setOpenDialog(true);
+    console.log('Navigating to edit product:', product);
+    // Navigate to the EditProduct component with the product ID
+    navigate(`/admin/edit-product/${product.id}`);
   };
 
   const handleSaveProduct = async () => {
@@ -340,11 +324,10 @@ const ProductManagement = () => {
       // Add product data - convert boolean values properly
       formData.append('name', productForm.name.trim());
       formData.append('description', productForm.description.trim());
-      formData.append('sku', productForm.sku.trim());
-      formData.append('price', parseFloat(productForm.price));
+      formData.append('price', Math.round(parseFloat(productForm.price)));
       // Only append sale_price if it has a value
       if (productForm.sale_price && productForm.sale_price !== '') {
-        formData.append('sale_price', parseFloat(productForm.sale_price));
+        formData.append('sale_price', Math.round(parseFloat(productForm.sale_price)));
       }
       formData.append('stock_quantity', parseInt(productForm.stock_quantity));
       formData.append('category_id', productForm.category_id);
@@ -514,14 +497,6 @@ const ProductManagement = () => {
       errors.description = '📄 Description should be at least 10 characters to be meaningful';
     } else if (productForm.description.trim().length > 1000) {
       errors.description = '📄 Description should not exceed 1000 characters';
-    }
-    
-    if (!productForm.sku.trim()) {
-      errors.sku = '🏷️ Please enter a SKU (Stock Keeping Unit)';
-    } else if (productForm.sku.trim().length < 3) {
-      errors.sku = '🏷️ SKU should be at least 3 characters long';
-    } else if (productForm.sku.trim().length > 50) {
-      errors.sku = '🏷️ SKU should not exceed 50 characters';
     }
     
     if (!productForm.price || productForm.price <= 0) {
@@ -715,20 +690,34 @@ const ProductManagement = () => {
         <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#212121' }}>
           Product Management
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => navigate('/admin/add-product')}
-          sx={{
-            backgroundColor: '#FFD700',
-            color: '#2C2C2C',
-            '&:hover': { backgroundColor: '#F57F17' },
-            px: 3,
-            py: 1,
-          }}
-        >
-          Add Product
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant={viewMode === 'table' ? 'contained' : 'outlined'}
+            onClick={() => setViewMode('table')}
+          >
+            Table View
+          </Button>
+          <Button
+            variant={viewMode === 'grid' ? 'contained' : 'outlined'}
+            onClick={() => setViewMode('grid')}
+          >
+            Grid View
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => navigate('/admin/add-product')}
+            sx={{
+              backgroundColor: '#FFD700',
+              color: '#2C2C2C',
+              '&:hover': { backgroundColor: '#F57F17' },
+              px: 3,
+              py: 1,
+            }}
+          >
+            Add Product
+          </Button>
+        </Box>
       </Box>
 
       {/* Tabs */}
@@ -750,7 +739,7 @@ const ProductManagement = () => {
           }}
           sx={{ flexGrow: 1 }}
         />
-        <FormControl sx={{ minWidth: 200 }}>
+        <FormControl sx={{ minWidth: 200 }} variant="standard">
           <InputLabel>Category</InputLabel>
           <Select
             value={selectedCategory}
@@ -765,20 +754,35 @@ const ProductManagement = () => {
             ))}
           </Select>
         </FormControl>
+        <FormControl sx={{ minWidth: 200 }} variant="standard">
+          <InputLabel>Stock Status</InputLabel>
+          <Select
+            value={stockFilter}
+            label="Stock Status"
+            onChange={(e) => {
+              setStockFilter(e.target.value);
+              setPage(0);
+            }}
+          >
+            <MenuItem value="all">All Products</MenuItem>
+            <MenuItem value="in_stock">In Stock</MenuItem>
+            <MenuItem value="out_of_stock">Out of Stock</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
-      {/* Products Table */}
-      {tabValue === 0 && (
+      {/* Products Table / Grid */}
+      {tabValue === 0 && viewMode === 'table' && (
         <Card>
           <TableContainer>
             <Table>
               <TableHead>
                 <TableRow>
                   <TableCell>Product</TableCell>
-                  <TableCell>SKU</TableCell>
+                  <TableCell>Product ID</TableCell>
                   <TableCell>Category</TableCell>
-                  <TableCell>Price</TableCell>
                   <TableCell>Stock</TableCell>
+                  <TableCell>Variants</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -790,7 +794,7 @@ const ProductManagement = () => {
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
-                ) : !products || products.length === 0 ? (
+                ) : !filteredProducts || filteredProducts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
                       <Typography variant="body1" sx={{ color: '#757575' }}>
@@ -799,7 +803,7 @@ const ProductManagement = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  (Array.isArray(products) ? products : []).map((product) => (
+                  filteredProducts.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -820,8 +824,8 @@ const ProductManagement = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {product.sku}
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#1976d2' }}>
+                          {product.product_id || 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -832,24 +836,17 @@ const ProductManagement = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        <Box>
-                          <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                            ₨{product.sale_price ? product.sale_price : product.price}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Inventory sx={{ fontSize: 16, color: '#757575' }} />
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {renderStock(product)}
                           </Typography>
-                          {product.sale_price && (
-                            <Typography variant="caption" sx={{ textDecoration: 'line-through', color: '#757575' }}>
-                              ₨{product.price}
-                            </Typography>
-                          )}
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Inventory sx={{ fontSize: 16, color: '#757575' }} />
-                          <Typography variant="body2">
-                            {product.stock_quantity}
-                          </Typography>
-                        </Box>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                          {product.variants ? product.variants.length : 0}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -882,13 +879,87 @@ const ProductManagement = () => {
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
-            count={products?.length || 0}
+            count={filteredProducts?.length || 0}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
           />
         </Card>
+      )}
+
+      {tabValue === 0 && viewMode === 'grid' && (
+        <Grid container spacing={2}>
+          {(loading ? [] : filteredProducts).map((product) => {
+            const totalStock = renderStock(product);
+            return (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <Box
+                    component="img"
+                    src={getProductImageUrl(product.images)}
+                    alt={product.name}
+                    sx={{
+                      width: '100%',
+                      height: 180,
+                      objectFit: 'cover',
+                      borderTopLeftRadius: 4,
+                      borderTopRightRadius: 4,
+                    }}
+                  />
+                  <Box sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                      {product.name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip label={product.category?.name || 'Uncategorized'} size="small" icon={<Category />} />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Inventory sx={{ fontSize: 16, color: '#757575' }} />
+                        <Typography variant="body2">{totalStock}</Typography>
+                      </Box>
+                      <Chip label={getStatusLabel(product.stock_status)} color={getStatusColor(product.stock_status)} size="small" />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        Variants: {product.variants ? product.variants.length : 0}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mt: 'auto', display: 'flex', gap: 1 }}>
+                      <Tooltip title="Edit">
+                        <IconButton onClick={() => handleEditProduct(product)} size="small">
+                          <Edit />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton onClick={() => handleDeleteProduct(product)} size="small" color="error">
+                          <Delete />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                </Card>
+              </Grid>
+            );
+          })}
+          {loading && (
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            </Grid>
+          )}
+          {!loading && (!filteredProducts || filteredProducts.length === 0) && (
+            <Grid item xs={12}>
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" sx={{ color: '#757575' }}>
+                  No products found
+                </Typography>
+              </Box>
+            </Grid>
+          )}
+        </Grid>
       )}
 
 
@@ -916,17 +987,6 @@ const ProductManagement = () => {
                 onChange={(e) => handleFieldChange('name', e.target.value)}
                 error={!!formErrors.name}
                 helperText={formErrors.name}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="SKU"
-                value={productForm.sku}
-                onChange={(e) => handleFieldChange('sku', e.target.value)}
-                error={!!formErrors.sku}
-                helperText={formErrors.sku}
                 required
               />
             </Grid>
@@ -1145,6 +1205,7 @@ const ProductManagement = () => {
                   </MenuItem>
                   <MenuItem value="Winter">Winter Collection</MenuItem>
                   <MenuItem value="Summer">Summer Collection</MenuItem>
+                  <MenuItem value="All Season">All Season Collection</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

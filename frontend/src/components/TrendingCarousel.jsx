@@ -16,9 +16,10 @@ import {
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import api from "../services/api";
 import { getProductImageUrl } from "../utils/imageUtils";
+import CartSelectionModal from "./CartSelectionModal";
 
 const TrendingCarousel = () => {
   const navigate = useNavigate();
@@ -28,6 +29,8 @@ const TrendingCarousel = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [screenSize, setScreenSize] = useState('desktop');
   const [hoveredProduct, setHoveredProduct] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Handle screen size changes
   useEffect(() => {
@@ -88,16 +91,13 @@ const TrendingCarousel = () => {
 
   // Handle add to cart
   const handleAddToCart = (product) => {
-    const cartItem = {
-      id: product.id,
-      name: product.name,
-      price: product.sale_price || product.price,
-      image: product.images?.[0]?.image_path || "",
-      size: product.sizes?.[0] || "One Size",
-      color: product.colors?.[0] || "Default",
-      quantity: 1,
-    };
-    addToCart(cartItem);
+    setSelectedProduct(product);
+    setModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setSelectedProduct(null);
   };
 
   // Handle product click
@@ -432,7 +432,13 @@ const TrendingCarousel = () => {
           <ArrowForwardIosIcon sx={{ fontSize: "1.5rem" }} />
         </IconButton>
       </Box>
-    
+
+      {/* Cart Selection Modal */}
+      <CartSelectionModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        product={selectedProduct}
+      />
     </Box>
   );
 };

@@ -1,9 +1,9 @@
-// Force production API URL - Hardcoded for production
-//const API_BASE_URL = '/api';
-const API_BASE_URL ='http://localhost:8000/api' // Hardcoded for production
+// Use environment variables for both development and production
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 console.log('API Config:', {
-  VITE_API_BASE: import.meta.env.VITE_API_BASE,
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  VITE_STORAGE_URL: import.meta.env.VITE_STORAGE_URL,
   API_BASE_URL: API_BASE_URL
 });
 
@@ -76,6 +76,7 @@ class ApiService {
       }
       
       console.log('API Response data:', data);
+      console.log('API Response success field:', data.success);
 
       if (!response.ok) {
         // Handle validation errors (422)
@@ -87,6 +88,7 @@ class ApiService {
         throw new Error(data.message || `Server error (${response.status}): ${data.error || 'An error occurred'}`);
       }
 
+      console.log('✅ API request successful, returning data:', data);
       return data;
     } catch (error) {
       console.error('API Error:', error);
@@ -110,9 +112,23 @@ class ApiService {
 
   async put(endpoint, data) {
     const isFormData = data instanceof FormData;
+    console.log('PUT request to:', endpoint);
+    console.log('Is FormData:', isFormData);
+    console.log('Data type:', typeof data);
+
+    // IMPORTANT: PHP/Symfony do not parse multipart bodies on true PUT/PATCH.
+    // For FormData, use POST with method override so Laravel can populate $request->all().
+    if (isFormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return this.request(endpoint, {
+        method: 'POST',
+        body: data,
+      });
+    }
+
     return this.request(endpoint, {
       method: 'PUT',
-      body: isFormData ? data : JSON.stringify(data),
+      body: JSON.stringify(data),
     });
   }
 
@@ -329,6 +345,22 @@ class ApiService {
     return this.request(`/categories/${id}`);
   }
 
+  // Admin-specific methods
+  async getAdminCategories() {
+    return this.request('/admin/categories');
+  }
+
+  async getSubcategories() {
+    return this.request('/subcategories');
+  }
+
+  async getNextProductId() {
+    console.log('🔍 API Service - getNextProductId called');
+    const response = await this.request('/products/next-id');
+    console.log('🔍 API Service - getNextProductId response:', response);
+    return response;
+  }
+
   async calculateCart(cartData) {
     return this.request('/cart/calculate', {
       method: 'POST',
@@ -338,7 +370,7 @@ class ApiService {
 
   async createOrder(orderData) {
     console.log('API: Creating order with data:', orderData);
-    return this.request('/orders', {
+    return this.request('/orders/with-variants', {
       method: 'POST',
       body: JSON.stringify(orderData),
     });

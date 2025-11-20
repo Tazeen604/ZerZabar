@@ -29,7 +29,7 @@ import {
   Close,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import { getProductImageUrl } from "../utils/imageUtils";
 
 const ProductCard = ({ 
@@ -85,6 +85,23 @@ const ProductCard = ({
     setModalOpen(true);
   };
 
+  const handleSizeChange = (size) => {
+    setSelectedSize(size);
+    
+    // If color is selected, check if it's available for the new size
+    if (selectedColor) {
+      const availableColorsForNewSize = product?.variants
+        ?.filter(variant => variant.size === size)
+        ?.map(variant => variant.color)
+        ?.filter(Boolean) || [];
+      
+      // If current color is not available for new size, clear it
+      if (!availableColorsForNewSize.includes(selectedColor)) {
+        setSelectedColor("");
+      }
+    }
+  };
+
   const handleModalClose = () => {
     setModalOpen(false);
     setSelectedSize("");
@@ -92,19 +109,101 @@ const ProductCard = ({
     setQuantity(1);
   };
 
+  // Extract unique sizes and colors from variants
+  const getAvailableSizes = () => {
+    if (!product?.variants?.length) return [];
+    const sizes = [...new Set(product.variants.map(v => v.size).filter(Boolean))];
+    return sizes;
+  };
+
+  const getAvailableColors = () => {
+    if (!product?.variants?.length) return [];
+    
+    // If a size is selected, only show colors available for that size
+    if (selectedSize) {
+      const colorsForSize = product.variants
+        .filter(variant => variant.size === selectedSize)
+        .map(variant => variant.color)
+        .filter(Boolean);
+      return [...new Set(colorsForSize)];
+    }
+    
+    // If no size selected, show all available colors
+    const colors = [...new Set(product.variants.map(v => v.color).filter(Boolean))];
+    return colors;
+  };
+
+  // Check if all required options are selected
+  const areAllOptionsSelected = () => {
+    const availableSizes = getAvailableSizes();
+    const availableColors = getAvailableColors();
+    const hasSize = !availableSizes.length || selectedSize;
+    const hasColor = !availableColors.length || selectedColor;
+    return hasSize && hasColor;
+  };
+
+  // Get current stock from the selected variant
+  const getCurrentStock = () => {
+    if (!product || !product.variants?.length) return 0;
+    
+    // Find the specific variant based on selected size and color
+    const selectedVariant = product.variants.find(variant => 
+      variant.size === selectedSize && variant.color === selectedColor
+    );
+    
+    if (!selectedVariant) return 0;
+    
+    // Return the variant's inventory quantity
+    return selectedVariant.quantity || 0;
+  };
+
+  // Get button text based on selection status
+  const getButtonText = () => {
+    if (!areAllOptionsSelected()) return "Select Options";
+    const currentStock = getCurrentStock();
+    if (currentStock === 0) return "Out of Stock";
+    return "Add to Cart";
+  };
+
   const handleModalAddToCart = () => {
+    const availableSizes = getAvailableSizes();
+    const availableColors = getAvailableColors();
+    
+    // Check stock availability before adding to cart
+    const currentStock = getCurrentStock();
+    if (currentStock === 0) {
+      setSnackbarMessage("This variant is out of stock");
+      setSnackbarOpen(true);
+      return;
+    }
+    if (quantity > currentStock) {
+      setSnackbarMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+      setSnackbarOpen(true);
+      return;
+    }
+    
+    // Find the selected variant to get the correct price
+    const selectedVariant = product.variants?.find(variant => 
+      variant.size === (selectedSize || availableSizes[0]) && 
+      variant.color === (selectedColor || availableColors[0])
+    );
+    
+    const variantPrice = selectedVariant?.sale_price || selectedVariant?.price || 0;
+    const variantOriginalPrice = selectedVariant?.sale_price ? selectedVariant?.price : null;
+    
     const cartItem = {
       id: product.id,
       name: product.name,
-      price: parseFloat(product.sale_price || product.price || 0),
-      originalPrice: product.sale_price ? parseFloat(product.price || 0) : null,
+      product_id: product.product_id, // Admin-entered Product ID
+      price: parseFloat(variantPrice),
+      originalPrice: variantOriginalPrice ? parseFloat(variantOriginalPrice) : null,
       image: product.images?.[0]?.image_path,
-      size: selectedSize || (product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0 ? product.sizes[0] : 'M'),
-      color: selectedColor || (product.colors && Array.isArray(product.colors) && product.colors.length > 0 ? product.colors[0] : ''),
+      size: selectedSize || (availableSizes.length > 0 ? availableSizes[0] : ''),
+      color: selectedColor || (availableColors.length > 0 ? availableColors[0] : ''),
       quantity: quantity,
       // Include product variants for cart editing
-      sizes: product.sizes || [],
-      colors: product.colors || [],
+      sizes: availableSizes,
+      colors: availableColors,
       variants: product.variants || []
     };
     
@@ -213,12 +312,45 @@ const ProductCard = ({
     if (variant === "minimal") {
       return (
         <Box sx={{ p: 1 }}>
-          <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
+          <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5, fontSize: { xs: "0.7rem", sm: "0.75rem" } }}>
             {product.name}
           </Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            ₨{product.sale_price || product.price}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {(() => {
+              const salePrice = product?.variants?.[0]?.sale_price || product?.sale_price;
+              const originalPrice = product?.variants?.[0]?.price || product?.price;
+              
+              if (salePrice && salePrice < originalPrice) {
+                return (
+                  <>
+                    <Typography variant="body2" sx={{ 
+                      color: "error.main", 
+                      fontWeight: 600,
+                      fontSize: { xs: "0.7rem", sm: "0.75rem" } 
+                    }}>
+                      ₨{salePrice}
           </Typography>
+                    <Typography variant="body2" sx={{ 
+                      color: "text.secondary", 
+                      textDecoration: "line-through",
+                      fontSize: { xs: "0.6rem", sm: "0.7rem" } 
+                    }}>
+                      ₨{originalPrice}
+                    </Typography>
+                  </>
+                );
+              } else {
+                return (
+                  <Typography variant="body2" sx={{ 
+                    color: "text.secondary", 
+                    fontSize: { xs: "0.7rem", sm: "0.75rem" } 
+                  }}>
+                    ₨{originalPrice || 0}
+                  </Typography>
+                );
+              }
+            })()}
+          </Box>
         </Box>
       );
     }
@@ -226,25 +358,25 @@ const ProductCard = ({
     return (
       <CardContent sx={{ 
         height: "auto",
-        minHeight: { xs: "140px", sm: "auto" },
+        minHeight: { xs: "auto", sm: "auto" },
         display: "flex", 
         flexDirection: "column", 
         justifyContent: "flex-start",
-        m: { xs: 0.5, sm: 1 },
-        mb: { xs: 0, sm: 1 },
-        p: { xs: 1, sm: 2 }, 
-        pb: { xs: 1, sm: 1 },
-        "&:last-child": {mb:0 },
+        m: 0,
+        mb: 0,
+        p: { xs: 1.5, sm: 2 }, 
+        pb: { xs: 1,sm: 1 },
+        "&:last-child": { mb: 1, pb: { xs: 1, sm: 1 } },
         overflow: "visible",
       }}>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 0.1, sm: 0.5 } }}>
           {/* Category - Grey color */}
           {product.category && (
             <Typography 
               variant="body2" 
               sx={{ 
                 color: "#666",
-                fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                fontSize: { xs: "0.5rem", sm: "0.6rem" },
                 textTransform: "uppercase",
                 letterSpacing: "0.5px",
                 fontWeight: 500
@@ -259,7 +391,7 @@ const ProductCard = ({
             variant="h6" 
             sx={{ 
               fontWeight: 600, 
-              fontSize: { xs: "0.8rem", sm: "1rem" },
+              fontSize: { xs: "0.6rem", sm: "0.8rem" },
               lineHeight: 1.3,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -273,16 +405,43 @@ const ProductCard = ({
           </Typography>
           
           {/* Product Price - Black color */}
-          <Typography 
-            variant="h6" 
-            sx={{ 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {(() => {
+              const salePrice = product?.variants?.[0]?.sale_price || product?.sale_price;
+              const originalPrice = product?.variants?.[0]?.price || product?.price;
+              
+              if (salePrice && salePrice < originalPrice) {
+                return (
+                  <>
+                    <Typography variant="h6" sx={{ 
+                      color: "error.main", 
+                      fontWeight: 600,
+                      fontSize: { xs: "0.7rem", sm: "0.9rem" } 
+                    }}>
+                      ₨{salePrice}
+                    </Typography>
+                    <Typography variant="body2" sx={{ 
+                      color: "text.secondary", 
+                      textDecoration: "line-through",
+                      fontSize: { xs: "0.6rem", sm: "0.8rem" } 
+                    }}>
+                      ₨{originalPrice}
+                    </Typography>
+                  </>
+                );
+              } else {
+                return (
+                  <Typography variant="h6" sx={{ 
               fontWeight: 600, 
               color: "#000", 
-              fontSize: { xs: "0.9rem", sm: "1.1rem" } 
-            }}
-          >
-            ₨{product.sale_price || product.price}
+              fontSize: { xs: "0.7rem", sm: "0.9rem" } 
+                  }}>
+                    ₨{originalPrice || 0}
           </Typography>
+                );
+              }
+            })()}
+          </Box>
           
           {/* Stock Status - Red/Green color */}
           {showStock && (
@@ -294,9 +453,9 @@ const ProductCard = ({
                   let totalStock = 0;
                   
                   if (product.variants && product.variants.length > 0) {
-                    // Use variant inventory
+                    // Use variant quantity directly
                     totalStock = product.variants.reduce((sum, variant) => {
-                      return sum + (variant.inventory?.quantity || 0);
+                      return sum + (variant.quantity || 0);
                     }, 0);
                   } else {
                     // Fallback to legacy inventory fields
@@ -305,7 +464,7 @@ const ProductCard = ({
                   
                   return totalStock > 0 ? "#4CAF50" : "#f44336";
                 })(),
-                fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                fontSize: { xs: "0.5rem", sm: "0.6rem" },
                 fontWeight: 600,
                 display: "block"
               }}
@@ -315,9 +474,9 @@ const ProductCard = ({
                 let totalStock = 0;
                 
                 if (product.variants && product.variants.length > 0) {
-                  // Use variant inventory
+                  // Use variant quantity directly - sum all variant quantities
                   totalStock = product.variants.reduce((sum, variant) => {
-                    return sum + (variant.inventory?.quantity || 0);
+                    return sum + (variant.quantity || 0);
                   }, 0);
                 } else {
                   // Fallback to legacy inventory fields
@@ -338,10 +497,11 @@ const ProductCard = ({
     <>
       <Card
         sx={{
-          height: { xs: "400px", sm: cardHeight },
-          width: variant === "minimal" ? "100%" : { xs: "calc(100% - 1px)", sm: "280px" },
-          minWidth: variant === "minimal" ? "auto" : { xs: "calc(100% - 1px)", sm: "280px" },
-          maxWidth: variant === "minimal" ? "100%" : { xs: "calc(100% - 1px)", sm: "280px" },
+          height: { xs: "auto", sm: cardHeight },
+          minHeight: { xs: "auto", sm: "350px" },
+          width: variant === "minimal" ? "100%" : { xs: "calc(100% - 1px)", sm: "100%" },
+          minWidth: variant === "minimal" ? "auto" : { xs: "calc(100% - 1px)", sm: "220px" },
+          maxWidth: variant === "minimal" ? "100%" : { xs: "calc(100% - 1px)", sm: "320px" },
           display: "flex",
           flexDirection: "column",
           cursor: "pointer",
@@ -363,9 +523,9 @@ const ProductCard = ({
           sx={{
             position: "relative",
             width: "100%",
-            height: { xs: "220px", sm: imageHeight },
-            minHeight: { xs: "220px", sm: imageHeight },
-            maxHeight: { xs: "220px", sm: imageHeight },
+            height: { xs: "180px", sm: imageHeight },
+            minHeight: { xs: "180px", sm: imageHeight },
+            maxHeight: { xs: "180px", sm: imageHeight },
             overflow: "hidden",
             backgroundColor: "#f9f9f9",
             flexShrink: 0,
@@ -418,13 +578,24 @@ const ProductCard = ({
             m: { xs: 0, sm: 2 },
             maxHeight: { xs: '100vh', sm: '90vh' },
             width: { xs: '100%', sm: 'auto' },
-            maxWidth: { xs: '100%', sm: '500px' }
+            maxWidth: { xs: '100%', sm: '500px' },
+            overflow: 'hidden', // Prevent scrollbar on paper
+            display: 'flex',
+            flexDirection: 'column'
           }
         }}
         sx={{
           '& .MuiDialog-paper': {
             margin: { xs: 0, sm: '16px' },
-            maxHeight: { xs: '100vh', sm: '90vh' }
+            maxHeight: { xs: '100vh', sm: '90vh' },
+            overflow: 'hidden', // Prevent scrollbar
+            display: 'flex',
+            flexDirection: 'column'
+          },
+          '& .MuiDialogContent-root': {
+            overflow: 'hidden !important', // Force no scrollbar
+            overflowY: 'hidden !important',
+            overflowX: 'hidden !important'
           }
         }}
       >
@@ -459,8 +630,10 @@ const ProductCard = ({
         
         <DialogContent sx={{ 
           p: { xs: 2, sm: 3 },
+          overflow: 'hidden', // Prevent scrollbar
           '&.MuiDialogContent-root': {
-            paddingTop: { xs: 2, sm: 3 }
+            paddingTop: { xs: 2, sm: 3 },
+            overflow: 'hidden' // Prevent scrollbar
           }
         }}>
           <Box sx={{ 
@@ -472,7 +645,7 @@ const ProductCard = ({
             {/* Product Image */}
             <Box sx={{ 
               width: { xs: "100%", sm: 200 }, 
-              height: { xs: 250, sm: 200 }, 
+              height: { xs:300, sm: 350 }, 
               flexShrink: 0,
               mx: { xs: "auto", sm: 0 }
             }}>
@@ -502,12 +675,58 @@ const ProductCard = ({
               <Typography variant="h6" sx={{ fontWeight: 500, mb: 1 }}>
                 {product.name}
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 500, mb: 3, color: "#000" }}>
-                ₨{product.sale_price || product.price}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                {(() => {
+                  const salePrice = product?.variants?.[0]?.sale_price || product?.sale_price;
+                  const originalPrice = product?.variants?.[0]?.price || product?.price;
+                  
+                  if (salePrice && salePrice < originalPrice) {
+                    return (
+                      <>
+                        <Typography variant="h5" sx={{ 
+                          color: "error.main", 
+                          fontWeight: 500,
+                          fontSize: "1.25rem" 
+                        }}>
+                          ₨{salePrice}
               </Typography>
+                        <Typography variant="h6" sx={{ 
+                          color: "text.secondary", 
+                          textDecoration: "line-through",
+                          fontSize: "1rem" 
+                        }}>
+                          ₨{originalPrice}
+                        </Typography>
+                      </>
+                    );
+                  } else {
+                    return (
+                      <Typography variant="h5" sx={{ 
+                        fontWeight: 500, 
+                        color: "#000",
+                        fontSize: "1.25rem" 
+                      }}>
+                        ₨{originalPrice || 0}
+                      </Typography>
+                    );
+                  }
+                })()}
+              </Box>
+              
+              {/* Stock indicator */}
+              {selectedSize && selectedColor && (
+                <Typography variant="body2" sx={{ 
+                  color: getCurrentStock() > 0 ? 'success.main' : 'error.main',
+                  fontSize: { xs: "0.85rem", sm: "0.9rem" },
+                  mb: 2,
+                  fontWeight: 500
+                }}>
+                  {getCurrentStock() > 0 ? `${getCurrentStock()} items available` : 'Out of stock'}
+                </Typography>
+              )}
               
               {/* Size Selection */}
-              {product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0 && (
+              {getAvailableSizes().length > 0 && (
                 <FormControl fullWidth sx={{ mb: { xs: 2, sm: 2 } }}>
                   <InputLabel sx={{ 
                     fontSize: { xs: "0.9rem", sm: "1rem" },
@@ -518,7 +737,7 @@ const ProductCard = ({
                   }}>Size</InputLabel>
                   <Select
                     value={selectedSize}
-                    onChange={(e) => setSelectedSize(e.target.value)}
+                    onChange={(e) => handleSizeChange(e.target.value)}
                     label="Size"
                     sx={{ 
                       fontSize: { xs: "0.9rem", sm: "1rem" },
@@ -537,7 +756,7 @@ const ProductCard = ({
                       }
                     }}
                   >
-                    {product.sizes.map((size) => (
+                    {getAvailableSizes().map((size) => (
                       <MenuItem key={size} value={size} sx={{ 
                         fontSize: { xs: "0.9rem", sm: "1rem" },
                         minHeight: { xs: "48px", sm: "40px" }
@@ -550,46 +769,35 @@ const ProductCard = ({
               )}
               
               {/* Color Selection */}
-              {product.colors && Array.isArray(product.colors) && product.colors.length > 0 && (
-                <FormControl fullWidth sx={{ mb: { xs: 2, sm: 2 } }}>
-                  <InputLabel sx={{ 
-                    fontSize: { xs: "0.9rem", sm: "1rem" },
-                    transform: selectedColor ? 'translate(14px, -9px) scale(0.75)' : 'translate(14px, 20px) scale(1)',
-                    '&.Mui-focused': {
-                      transform: 'translate(14px, -9px) scale(0.75)'
-                    }
-                  }}>Color</InputLabel>
-                  <Select
-                    value={selectedColor}
-                    onChange={(e) => setSelectedColor(e.target.value)}
-                    label="Color"
-                    sx={{ 
-                      fontSize: { xs: "0.9rem", sm: "1rem" },
-                      "& .MuiSelect-select": {
-                        padding: { xs: "16px 14px", sm: "16px 14px" },
-                        minHeight: { xs: "48px", sm: "40px" }
-                      },
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#e0e0e0"
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#000"
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#000"
-                      }
-                    }}
-                  >
-                    {product.colors.map((color) => (
-                      <MenuItem key={color} value={color} sx={{ 
-                        fontSize: { xs: "0.9rem", sm: "1rem" },
-                        minHeight: { xs: "48px", sm: "40px" }
-                      }}>
+              {getAvailableColors().length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: { xs: "0.9rem", sm: "0.875rem" } }}>Color</Typography>
+                  <Stack direction="row" spacing={{ xs: 1, sm: 1, md: 2 }} flexWrap="wrap" rowGap={{ xs: 0.5, md: 1.5 }}>
+                    {getAvailableColors().map((color, idx) => (
+                      <Button
+                        key={idx} 
+                        variant={selectedColor === color ? "contained" : "outlined"}
+                        onClick={() => setSelectedColor(color)}
+                        sx={{
+                          width: 65,
+                          minWidth: { xs: 35, sm: 45, md: 65 },
+                          height: { xs: 28, sm: 28, md: 28 },
+                          borderRadius: "18px",
+                          fontSize: { xs: "0.55rem", sm: "0.7rem" },
+                          backgroundColor: selectedColor === color ? "#000" : "transparent",
+                          color: selectedColor === color ? "#fff" : "#000",
+                          borderColor: "#000",
+                          marginBottom: { xs: 0.5, sm: 0 },
+                          "&:hover": {
+                            backgroundColor: selectedColor === color ? "#333" : "rgba(0,0,0,0.04)"
+                          }
+                        }}
+                      >
                         {color}
-                      </MenuItem>
+                      </Button>
                     ))}
-                  </Select>
-                </FormControl>
+                  </Stack>
+                </Box>
               )}
               
               {/* Quantity Selection */}
@@ -634,7 +842,21 @@ const ProductCard = ({
                   </Typography>
                   <Button
                     size="small"
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => {
+                      const currentStock = getCurrentStock();
+                      
+                      if (currentStock === 0) {
+                        setSnackbarMessage("This variant is out of stock");
+                        setSnackbarOpen(true);
+                        return;
+                      }
+                      if (quantity + 1 > currentStock) {
+                        setSnackbarMessage(`Only ${currentStock} items available in stock. Please select quantity accordingly.`);
+                        setSnackbarOpen(true);
+                        return;
+                      }
+                      setQuantity(quantity + 1);
+                    }}
                     sx={{ 
                       minWidth: { xs: 44, sm: 32 }, 
                       height: { xs: 44, sm: 32 },
@@ -688,8 +910,9 @@ const ProductCard = ({
               minHeight: { xs: "48px", sm: "40px" }
             }}
             startIcon={<ShoppingCart sx={{ fontSize: { xs: "1rem", sm: "1rem" } }} />}
+            disabled={!areAllOptionsSelected() || getCurrentStock() === 0}
           >
-            Add to Cart
+            {getButtonText()}
           </Button>
         </DialogActions>
       </Dialog>

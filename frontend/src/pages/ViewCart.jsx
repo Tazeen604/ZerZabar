@@ -30,9 +30,11 @@ import {
   Help,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/CartReservationContext";
 import PageContainer from "../components/PageContainer";
+import Footer from "../components/Footer";
 import { getCartImageUrl } from "../utils/imageUtils";
+import CartEditModal from "../components/CartEditModal";
 
 const ViewCart = () => {
   const navigate = useNavigate();
@@ -41,8 +43,7 @@ const ViewCart = () => {
     removeFromCart,
     updateQuantity,
     clearCart,
-    getTotalPrice,
-    getTotalItems,
+    getCartTotals,
   } = useCart();
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -68,9 +69,23 @@ const ViewCart = () => {
     navigate("/");
   };
 
+  // Edit modal state for cart item editing
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  const handleEditItem = (item) => {
+    setSelectedItem(item);
+    setEditModalOpen(true);
+  };
+
+  const handleEditModalClose = () => {
+    setEditModalOpen(false);
+    setSelectedItem(null);
+  };
+
   if (items.length === 0) {
     return (
-      <Box sx={{ minHeight: "100vh", background: "#ffffff" }}>
+      <Box sx={{ minHeight: "calc(100vh - 120px)", background: "#ffffff", pt: 8 }}>
         {/* Empty Cart */}
         <Box
           sx={{
@@ -125,40 +140,40 @@ const ViewCart = () => {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", background: "#ffffff", py: 4 }}>
+    <Box sx={{ minHeight: "calc(100vh - 120px)", background: "#ffffff", pt: { xs: 10, sm: 10, md: 10 }, pb: 4 }}>
       <Breadcrumbs />
       <Box sx={{ maxWidth: "1800px", mx: "auto", px: 3 }}>
         {/* Header */}
-        <Box sx={{ display: "flex", alignItems: "center", mb: 4,mt:8, justifyContent: "center" }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 4, mt: 4, justifyContent: "center" }}>
           <ShoppingCart sx={{ fontSize: "1.5rem", mr: 1, color: "#000" }} />
           <Typography variant="h4" sx={{ fontWeight: "bold", color: "#000", fontSize: "1.875rem" }}>
             My Cart
           </Typography>
         </Box>
 
-        <Grid container spacing={6} justifyContent="center">
+        <Grid container spacing={{ xs: 2, md: 3 }} justifyContent="center">
           {/* Left Side - Cart Items */}
-          <Grid item xs={12} lg={7} sx={{ pr: { lg: 2 } }}>
+          <Grid item xs={12} lg={7} sx={{ pr: { lg: 1 } }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {items.map((item) => (
                 <Paper
                   key={item.cartId}
                   sx={{
-                    p: 3,
+                    p: { xs: 2, sm: 3 },
                     backgroundColor: "white",
                     minHeight: "200px",
                     width: "100%",
                     borderBottom: "1px solid #eee",
-                    pb: 2,
+                    pb: { xs: 1.5, sm: 2 },
                     mb: 2,
                   }}
                 >
-                  <Box sx={{ display: "flex", gap: 2 }}>
+                  <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
                     {/* Product Image */}
                     <Box
                       sx={{
-                        width: 140,
-                        height: 180,
+                        width: { xs: "100%", sm: 140 },
+                        height: { xs: 220, sm: 180 },
                         overflow: "hidden",
                         borderRadius: "8px",
                         backgroundColor: "#f5f5f5",
@@ -193,7 +208,7 @@ const ViewCart = () => {
                         </Box>
 
                         {/* Product Details */}
-                    <Box sx={{ flexGrow: 1,ml:6 }}>
+                    <Box sx={{ flexGrow: 1, ml: { xs: 0, sm: 2, md: 6 }, mt: { xs: 1, sm: 0 } }}>
                       <Typography variant="subtitle1" sx={{ fontWeight: "bold", mb: 1, fontSize: "0.9375rem" }}>
                             {item.name}
                           </Typography>
@@ -214,7 +229,7 @@ const ViewCart = () => {
                         </Typography>
                       </Box>
 
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2 }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2, flexWrap: { xs: "wrap", sm: "nowrap" }, gap: { xs: 1, sm: 0 } }}>
                         {/* Price */}
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
@@ -278,32 +293,12 @@ const ViewCart = () => {
                         <Typography 
                           variant="caption" 
                           sx={{ color: "#666", cursor: "pointer", fontSize: "0.8125rem" }}
-                          onClick={() => {
-                            // Edit functionality - could open a modal or navigate to product page
-                            console.log('Edit item:', item);
-                            // For now, just log - you can implement edit modal later
-                          }}
+                          onClick={() => handleEditItem(item)}
                         >
                           Edit
                         </Typography>
-                        <Typography 
-                          variant="caption" 
-                          sx={{ color: "#666", cursor: "pointer", fontSize: "0.8125rem" }}
-                          onClick={() => removeFromCart(item.cartId)}
-                        >
-                          Remove
-                        </Typography>
-                        <Typography 
-                          variant="caption" 
-                          sx={{ color: "#666", cursor: "pointer", fontSize: "0.8125rem" }}
-                          onClick={() => {
-                            // Add to wishlist functionality
-                            console.log('Add to wishlist:', item);
-                            // You can implement wishlist functionality here
-                          }}
-                        >
-                          Add to Wishlist
-                        </Typography>
+                       
+                       
                           </Box>
                         </Box>
                       </Box>
@@ -313,17 +308,17 @@ const ViewCart = () => {
               {/* Cart Subtotal */}
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
-                  {getTotalItems()} Items
+                  {getCartTotals().itemCount} Items
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
-                 Total ₨{getTotalPrice().toFixed(2)}
+                 Total ₨{getCartTotals().totalAmount.toFixed(2)}
                 </Typography>
               </Box>
             </Box>
           </Grid>
 
           {/* Right Side - Order Summary */}
-          <Grid item xs={12} lg={3} sx={{ pl: { lg: 2 } }}>
+          <Grid item xs={12} lg={3} sx={{ pl: { lg: 1 } }}>
             <Paper sx={{ p: 3, backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
               {/* Promo Code */}
               <Box sx={{ mb: 3 }}>
@@ -361,7 +356,7 @@ const ViewCart = () => {
                     Estimated Total
                     </Typography>
                   <Typography variant="subtitle1" sx={{ fontWeight: "bold", fontSize: "0.9375rem" }}>
-                    ₨{(getTotalPrice() + 200).toFixed(2)}
+                    ₨{(getCartTotals().totalAmount + 200).toFixed(2)}
                     </Typography>
                   </Box>
                 </Box>
@@ -423,6 +418,14 @@ const ViewCart = () => {
           </Grid>
         </Grid>
       </Box>
+      <Footer />
+      {/* Cart Edit Modal */}
+      <CartEditModal
+        open={editModalOpen}
+        onClose={handleEditModalClose}
+        cartItem={selectedItem}
+        onUpdate={() => {}}
+      />
     </Box>
   );
 };
